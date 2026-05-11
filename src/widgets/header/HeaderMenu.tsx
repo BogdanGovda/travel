@@ -9,10 +9,10 @@ function HeaderMenu() {
         <HeaderTopBar></HeaderTopBar>
         <div className={styles.list}>
           <Link to="/" className={styles.link}>
-            Пошук тура
+            Товари
           </Link>
           <Link to="/about" className={styles.link}>
-            Напрямок
+            Каталог
           </Link>
         </div>
       </nav>

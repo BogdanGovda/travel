@@ -1,6 +1,6 @@
 import styles from "./Header.module.scss";
 import HeaderMenu from "./HeaderMenu";
-import logo from "@/assets/logo.svg";
+import logo from "@/assets/img/logo.webp";
 
 function Header() {
   return (

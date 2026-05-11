@@ -2,11 +2,12 @@ import { Link } from "react-router-dom";
 import styles from "./Header.module.scss";
 import phone from "@/assets/phone.svg";
 import mail from "@/assets/mail.svg";
-import { useContext } from "react";
-import { useCart } from "@/features/cart/CartContext";
+import { useSelector } from "react-redux";
+import type { RootState } from "@reduxjs/toolkit/query";
+import { MdOutlineShoppingCart } from "react-icons/md";
 
 function HeaderTopBar() {
-  const { cart } = useCart();
+  const cart = useSelector((state: RootState) => state.cart.cart);
   return (
     <>
       <div className={styles.topBar}>
@@ -23,8 +24,10 @@ function HeaderTopBar() {
             contact@email.ee
           </Link>
           <Link to="#" className="login"></Link>
-          <Link to="#">UA</Link>
-          <Link to="/cart">Кошик: {cart.length}</Link>
+
+          <Link to="/cart">
+            <MdOutlineShoppingCart /> {cart.length}
+          </Link>
         </div>
       </div>
     </>

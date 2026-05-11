@@ -41,6 +41,67 @@
 }
 .btns {
   margin-top: 10px;
+  button {
+    width: 100%;
+  }
+}
+
+.item__img {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  img {
+    height: 340px;
+    width: 272px;
+  }
+}
+.item {
+  &__like {
+    width: 33px;
+    height: 28px;
+    position: absolute;
+    z-index: 1;
+    right: 0;
+    top: 5%;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    svg {
+      height: 100%;
+      width: 100%;
+      &:hover {
+        fill: orange;
+      }
+    }
+  }
+}
+
+.btn__order {
+  overflow: hidden;
+  position: relative;
+  display: block;
+  width: 220px;
+  padding: 22px 52px 23px 51px;
+  border-radius: 5px;
+  font-size: 16px;
+  line-height: 18px;
+  letter-spacing: 0.2px;
+  color: white;
+  background: #956d84;
+  border: none;
+  &:hover {
+    background: #634b59;
+    cursor: pointer;
+  }
+  img {
+    overflow: hidden;
+    position: absolute;
+    top: -15px;
+    right: -21px;
+    width: 85px;
+    height: 112px;
+    rotate: calc(45%);
+  }
 }

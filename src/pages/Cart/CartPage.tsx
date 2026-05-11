@@ -1,65 +1,70 @@
 import { useContext, useMemo } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import styles from "./Cart.module.scss";
-import { useCart } from "@/features/cart/CartContext";
+import btnBg from "@/assets/icon/btnBg.svg";
+import { MdDelete } from "react-icons/md";
 import type { Tour } from "@/shared/api/types";
+import {
+  addToCart,
+  removeAllFromCart,
+  removeFromCart,
+} from "@/features/cart/cartSlice";
+import type { RootState } from "@reduxjs/toolkit/query";
 
 function CartPage() {
   const dispatch = useDispatch();
-  const { cart, addToCart, removeFromCart, removeAllFromCart } = useCart();
+
+  const cart = useSelector((state: RootState) => state.cart.cart);
 
   const totalPrice = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.item.price * item.count, 0);
+    return cart.reduce((sum, el) => sum + el.item.price * el.count, 0);
+  }, [cart]);
+
+  const itemList = useMemo(() => {
+    return cart.map(({ item, count }) => (
+      <div className={styles.item} key={item.id} style={{ display: "flex" }}>
+        <div className={styles.item__img}>
+          <img src={item.img} alt="" />
+        </div>
+        <div className={styles.info}>
+          <div className="item__name">{item.title}</div>
+          <div className="item__price">{item.price * count}$</div>
+
+          <div className={styles.count}>
+            <button onClick={() => dispatch(addToCart(item))}>+</button>
+            <div className="item__count">{count}</div>
+            <button onClick={() => dispatch(removeFromCart(item.id))}>-</button>
+          </div>
+          <button onClick={() => dispatch(removeAllFromCart(item.id))}>
+            <MdDelete />
+          </button>
+        </div>
+      </div>
+    ));
   }, [cart]);
 
   return (
     <section className="cart">
       <div className={styles.wrapper}>
         <h1>Кошик</h1>
-
-        <div className="list">
-          {cart.length > 0 ? (
-            cart.map(({ item, count }) => (
-              <div className="item" key={item.id} style={{ display: "flex" }}>
-                <div
-                  className="item__img"
-                  style={{
-                    height: "200px",
-                    width: "300px",
-                    backgroundColor: item.img,
-                    borderTopLeftRadius: "10px",
-                    borderTopRightRadius: "10px",
-                  }}
-                ></div>
-                <div className={styles.info}>
-                  <div className="item__name">{item.title}</div>
-                  <div className={styles.count}>
-                    <button onClick={() => addToCart(item)}>+</button>
-                    <div className="item__count">{count}</div>
-                    <button onClick={() => removeFromCart(item.id)}>-</button>
-                  </div>
-                  <div className="item__price">{item.price * count}$</div>
-                </div>
-                <div className="div">
-                  <button onClick={() => removeAllFromCart(item.id)}>
-                    Видалити з кошика
-                  </button>
-                </div>
-              </div>
-            ))
+        <div className={styles.content}>
+          <div className={styles.list}>
+            {itemList.length > 0 ? itemList : <h3>Кошик пустий</h3>}
+          </div>
+          {itemList.length > 0 ? (
+            <div className={styles.ofer}>
+              <h2>Ваших товарів</h2>
+              <h3>На суму: {totalPrice} $</h3>
+              <button className={styles.btn__ofer}>
+                оплатити
+                <img src={btnBg} alt="" />
+              </button>
+            </div>
           ) : (
-            <h3>Кошик пустий</h3>
+            <Link to="/">Добавте товар у кошик</Link>
           )}
         </div>
-        {cart.length > 0 ? (
-          <div className={styles.ofer}>
-            <h3>Сума оплати: {totalPrice} $</h3>
-            <button>оплатити</button>
-          </div>
-        ) : (
-          <Link to="/">Добавте товар у кошик</Link>
-        )}
       </div>
     </section>
   );

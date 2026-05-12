@@ -1,11 +1,9 @@
-import { useContext } from "react";
 import { CustomSwiper } from "@/shared/ui/swiper/Swiper";
 import { SwiperSlide } from "swiper/react";
 import styles from "./TourList.module.scss";
 import type { Tour } from "@/shared/api/types";
 import { useDispatch } from "react-redux";
 import { addToCart } from "@/features/cart/cartSlice";
-import { CiShoppingCart } from "react-icons/ci";
 import { CiStar } from "react-icons/ci";
 import btnBg from "@/assets/icon/btnBg.svg";
 interface Props {
@@ -13,7 +11,6 @@ interface Props {
 }
 
 function TourList({ tours }: Props) {
-  // const { addToCart } = useCart();
   const dispatch = useDispatch();
 
   return (

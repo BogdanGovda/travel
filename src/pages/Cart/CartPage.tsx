@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import styles from "./Cart.module.scss";
 import btnBg from "@/assets/icon/btnBg.svg";
 import { MdDelete } from "react-icons/md";
-import type { Tour } from "@/shared/api/types";
 import {
   addToCart,
   removeAllFromCart,
@@ -34,7 +33,12 @@ function CartPage() {
           <div className={styles.count}>
             <button onClick={() => dispatch(addToCart(item))}>+</button>
             <div className="item__count">{count}</div>
-            <button onClick={() => dispatch(removeFromCart(item.id))}>-</button>
+            <button
+              disabled={count === 1}
+              onClick={() => dispatch(removeFromCart(item.id))}
+            >
+              -
+            </button>
           </div>
           <button onClick={() => dispatch(removeAllFromCart(item.id))}>
             <MdDelete />
@@ -50,9 +54,9 @@ function CartPage() {
         <h1>Кошик</h1>
         <div className={styles.content}>
           <div className={styles.list}>
-            {itemList.length > 0 ? itemList : <h3>Кошик пустий</h3>}
+            {cart.length > 0 ? itemList : <h3>Кошик пустий</h3>}
           </div>
-          {itemList.length > 0 ? (
+          {cart.length > 0 ? (
             <div className={styles.ofer}>
               <h2>Ваших товарів</h2>
               <h3>На суму: {totalPrice} $</h3>

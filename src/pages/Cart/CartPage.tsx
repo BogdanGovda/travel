@@ -9,12 +9,12 @@ import {
   removeAllFromCart,
   removeFromCart,
 } from "@/features/cart/cartSlice";
-import type { RootState } from "@reduxjs/toolkit/query";
+import type { RootState } from "@/store/store";
 
 function CartPage() {
   const dispatch = useDispatch();
 
-  const cart = useSelector((state: RootState) => state.cart.cart);
+  const cart = useSelector((state: RootState) => state.cart);
 
   const totalPrice = useMemo(() => {
     return cart.reduce((sum, el) => sum + el.item.price * el.count, 0);

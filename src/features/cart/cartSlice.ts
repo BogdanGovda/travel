@@ -1,10 +1,9 @@
 import type { Tour } from "@/shared/api/types";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { CartState } from "@/shared/types";
+import { addToLocalStore } from "@/store/localStore";
 
-const initialState: CartState = {
-  cart: [],
-};
+const initialState: CartState = [];
 
 const cartSlice = createSlice({
   name: "cart",
@@ -12,30 +11,33 @@ const cartSlice = createSlice({
 
   reducers: {
     addToCart(state, action: PayloadAction<Tour>) {
-      const existing = state.cart.find(
-        (el) => el.item.id === action.payload.id,
-      );
-
+      const existing = state.find((el) => el.item.id === action.payload.id);
       if (existing) {
         existing.count += 1;
       } else {
-        state.cart.push({
+        state.push({
           item: action.payload,
           count: 1,
         });
       }
+      addToLocalStore("cart", state);
     },
 
     removeFromCart(state, action: PayloadAction<number>) {
-      state.cart = state.cart
+
+      const newState = state
         .map((el) =>
           el.item.id === action.payload ? { ...el, count: el.count - 1 } : el,
         )
         .filter((el) => el.count > 0);
+      addToLocalStore("cart", newState);
+      return newState;
     },
 
     removeAllFromCart(state, action: PayloadAction<number>) {
-      state.cart = state.cart.filter((el) => el.item.id !== action.payload);
+      const newState = state.filter((el) => el.item.id !== action.payload);
+      addToLocalStore("cart", newState);
+      return newState;
     },
   },
 });

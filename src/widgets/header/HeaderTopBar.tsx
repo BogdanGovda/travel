@@ -2,12 +2,13 @@ import { Link } from "react-router-dom";
 import styles from "./Header.module.scss";
 import phone from "@/assets/phone.svg";
 import mail from "@/assets/mail.svg";
-import { useSelector } from "react-redux";
-import type { RootState } from "@reduxjs/toolkit/query";
 import { MdOutlineShoppingCart } from "react-icons/md";
-
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store/store";
+import FavoriteModal from "../favorite/favoriteModal";
 function HeaderTopBar() {
-  const cart = useSelector((state: RootState) => state.cart.cart);
+  const cart = useSelector((state: RootState) => state.cart);
+
   return (
     <>
       <div className={styles.topBar}>
@@ -28,6 +29,7 @@ function HeaderTopBar() {
           <Link to="/cart">
             <MdOutlineShoppingCart /> {cart.length}
           </Link>
+          <FavoriteModal></FavoriteModal>
         </div>
       </div>
     </>

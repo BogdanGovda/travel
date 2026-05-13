@@ -16,6 +16,9 @@ export type CartType = {
   removeAllFromCart: (id: number) => void;
 };
 
-export type CartState = {
-  cart: CartItem[];
-};
+export type FavoriteItem = {
+  item: Tour;
+}
+
+export type CartState = CartItem[];
+export type FavoriteState = Tour[];

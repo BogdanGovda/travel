@@ -8,7 +8,7 @@ import {
   addToCart,
   removeAllFromCart,
   removeFromCart,
-} from "@/features/cart/cartSlice";
+} from "@/redux/cartSlice";
 import type { RootState } from "@/store/store";
 
 function CartPage() {
@@ -60,10 +60,10 @@ function CartPage() {
             <div className={styles.ofer}>
               <h2>Ваших товарів</h2>
               <h3>На суму: {totalPrice} $</h3>
-              <button className={styles.btn__ofer}>
-                оплатити
+              <Link to="/order" className={styles.btn__ofer}>
+                Оформити
                 <img src={btnBg} alt="" />
-              </button>
+              </Link>
             </div>
           ) : (
             <Link to="/">Добавте товар у кошик</Link>

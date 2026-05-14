@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
-import cartReducer from "@/features/cart/cartSlice";
+import cartReducer from "@/redux/cartSlice";
 import type { CartState, FavoriteState } from "@/shared/types";
-import { getFromLocalStore } from "./localStore";
+import { addToLocalStore, getFromLocalStore } from "./localStore";
 import favoriteReducer from "@/features/favorite/favoriteSlice";
 
 const preloadedState = {
@@ -17,10 +17,10 @@ export const store = configureStore({
   preloadedState,
 });
 
-store.subscribe(() => {
-  // addToLocalStore("cart", store.getState().cart);
-  // addToLocalStore("favorite", store.getState().favorite);
-});
+// store.subscribe(() => {
+//   // addToLocalStore("store", store.getState());
+//   // addToLocalStore("favorite", store.getState().favorite);
+// });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

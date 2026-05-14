@@ -4,14 +4,33 @@ import Typography from "@mui/material/Typography";
 import Modal from "@mui/material/Modal";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";
-import { MdFavorite } from "react-icons/md";
+import { MdFavorite, MdDelete } from "react-icons/md";
 import styles from "./favoriteModal.module.scss";
+import { addToFavorite } from "@/features/favorite/favoriteSlice";
+import { useDispatch } from "react-redux";
 
 export default function FavoriteModal() {
+  const dispatch = useDispatch();
   const [open, setOpen] = React.useState(false);
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
   const favorite = useSelector((state: RootState) => state.favorite);
+
+  const renderList = favorite.map((item) => {
+    return (
+      <div className={styles.modal__card}>
+        <img src={item.img} alt="" />
+        <h2>{item.title}</h2>
+        <div>{item.price} $</div>
+        <button
+          onClick={() => dispatch(addToFavorite(item))}
+          className={styles.modal__btn}
+        >
+          <MdDelete />
+        </button>
+      </div>
+    );
+  });
 
   return (
     <div>
@@ -31,9 +50,18 @@ export default function FavoriteModal() {
             variant="h6"
             component="h2"
           ></Typography>
-          <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-            Duis mollis, est non commodo luctus, nisi erat porttitor ligula.
-          </Typography>
+          <div>
+            <div className={styles.modal__title}>Ваше улюблене: </div>
+            {renderList.length > 0 ? (
+              renderList
+            ) : (
+              <div className={styles.modal__empty}>
+                <div className={styles.modal__subtitle}>
+                  Упс...У вас ще немає улюбленого
+                </div>
+              </div>
+            )}
+          </div>
         </Box>
       </Modal>
     </div>

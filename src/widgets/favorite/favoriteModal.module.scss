@@ -7,5 +7,42 @@
   background-color: #fff;
   border: 1px solid #000;
   box-shadow: 24px;
-  padding: 4px;
+  padding: 40px;
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  &__btn {
+    border: none;
+    background: none;
+    svg {
+      height: 30px;
+      width: 30px;
+    }
+  }
+  &__title {
+    font-size: 54px;
+    margin: 20px 0;
+  }
+
+  &__card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  &__subtitle {
+    font-size: 30px;
+  }
+  &__link {
+    font-size: 24px;
+    cursor: pointer;
+    color: #59869a;
+  }
 }

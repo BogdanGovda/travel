@@ -3,7 +3,7 @@ import { SwiperSlide } from "swiper/react";
 import styles from "./TourList.module.scss";
 import type { Tour } from "@/shared/api/types";
 import { useDispatch } from "react-redux";
-import { addToCart } from "@/features/cart/cartSlice";
+import { addToCart } from "@/redux/cartSlice";
 import { CiStar } from "react-icons/ci";
 import { addToFavorite } from "@/features/favorite/favoriteSlice";
 import btnBg from "@/assets/icon/btnBg.svg";
@@ -25,7 +25,10 @@ function TourList({ tours }: Props) {
           <SwiperSlide key={item.id} className={styles.card}>
             <div className={styles.item__img}>
               <img src={item.img} alt="" />
-              <button className={styles.item__like} onClick={() => dispatch(addToFavorite(item))}>
+              <button
+                className={styles.item__like}
+                onClick={() => dispatch(addToFavorite(item))}
+              >
                 <CiStar />
               </button>
             </div>

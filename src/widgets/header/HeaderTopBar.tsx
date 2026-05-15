@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import styles from "./Header.module.scss";
-import phone from "@/assets/phone.svg";
-import mail from "@/assets/mail.svg";
-import { MdOutlineShoppingCart } from "react-icons/md";
+import { MdOutlineShoppingCart, MdLocalPhone, MdEmail } from "react-icons/md";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";
 import FavoriteModal from "../favorite/favoriteModal";
@@ -17,11 +15,11 @@ function HeaderTopBar() {
           <Link to="#">Візи</Link>
           <Link to="#">Контакти</Link>
           <Link to="#">
-            <img src={phone} alt="" />
+            <MdLocalPhone />
             +380 63 234 0745
           </Link>
           <Link to="#">
-            <img src={mail} alt="" />
+            <MdEmail />
             contact@email.ee
           </Link>
           <Link to="#" className="login"></Link>

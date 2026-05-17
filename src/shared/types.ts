@@ -3,6 +3,8 @@ export interface Tour {
   title: string;
   img: string;
   price: number;
+  promotion: boolean;
+  promotionPrice?: number;
 }
 
 export type CartItem = {
@@ -18,7 +20,7 @@ export type CartType = {
 
 export type FavoriteItem = {
   item: Tour;
-}
+};
 
 export type CartState = CartItem[];
 export type FavoriteState = Tour[];

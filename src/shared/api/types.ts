@@ -3,4 +3,6 @@ export interface Tour {
   title: string;
   img: string;
   price: number;
+  promotion: boolean;
+  promotionPrice?: number;
 }

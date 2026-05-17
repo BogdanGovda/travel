@@ -31,6 +31,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    img {
+      max-width: 112px;
+      max-height: 124px;
+    }
   }
   &__empty {
     display: flex;
@@ -44,5 +48,13 @@
     font-size: 24px;
     cursor: pointer;
     color: #59869a;
+  }
+
+  &__old {
+    text-decoration: line-through;
+    color: gray;
+  }
+  &__new {
+    color: red;
   }
 }

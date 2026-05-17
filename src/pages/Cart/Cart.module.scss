@@ -76,6 +76,14 @@
   padding: 20px;
   border: 1px solid #956d84;
   border-radius: 5px;
+
+  &__old {
+    text-decoration: line-through;
+    color: gray;
+  }
+  &__new {
+    color: red;
+  }
 }
 
 .list {

@@ -17,7 +17,13 @@ function CartPage() {
   const cart = useSelector((state: RootState) => state.cart);
 
   const totalPrice = useMemo(() => {
-    return cart.reduce((sum, el) => sum + el.item.price * el.count, 0);
+    return cart.reduce((sum, el) => {
+      const currentPrice = el.item.promotion
+        ? el.item.promotionPrice
+        : el.item.price;
+
+      return sum + currentPrice * el.count;
+    }, 0);
   }, [cart]);
 
   const itemList = useMemo(() => {
@@ -28,7 +34,16 @@ function CartPage() {
         </div>
         <div className={styles.info}>
           <div className="item__name">{item.title}</div>
-          <div className="item__price">{item.price * count}$</div>
+          {item.promotion ? (
+            <div className="item__price">
+              <div className={styles.item__old}>{item.price * count}$</div>
+              <div className={styles.item__new}>
+                {item.promotionPrice * count}
+              </div>
+            </div>
+          ) : (
+            <div className="item__price">{item.price * count}$</div>
+          )}
 
           <div className={styles.count}>
             <button onClick={() => dispatch(addToCart(item))}>+</button>

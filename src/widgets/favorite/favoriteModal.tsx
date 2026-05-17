@@ -21,7 +21,13 @@ export default function FavoriteModal() {
       <div className={styles.modal__card}>
         <img src={item.img} alt="" />
         <h2>{item.title}</h2>
-        <div>{item.price} $</div>
+        <div className="price">
+          {item.promotion ? (
+            <div className={styles.modal__new}>{item.promotionPrice} $</div>
+          ) : (
+            <div>{item.price}$</div>
+          )}
+        </div>
         <button
           onClick={() => dispatch(addToFavorite(item))}
           className={styles.modal__btn}

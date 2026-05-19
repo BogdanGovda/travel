@@ -27,6 +27,9 @@ function HeaderTopBar() {
           <Link to="/cart">
             <MdOutlineShoppingCart /> {cart.length}
           </Link>
+          <div>
+            <Link to="/auth"> лог</Link>
+          </div>
           <FavoriteModal></FavoriteModal>
         </div>
       </div>

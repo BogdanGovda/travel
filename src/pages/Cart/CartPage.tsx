@@ -8,8 +8,10 @@ import {
   addToCart,
   removeAllFromCart,
   removeFromCart,
+  clearCart,
 } from "@/redux/cartSlice";
 import type { RootState } from "@/store/store";
+import { createOrder } from "@/shared/api/orderApi";
 
 function CartPage() {
   const dispatch = useDispatch();
@@ -62,7 +64,15 @@ function CartPage() {
       </div>
     ));
   }, [cart]);
-
+  const handleOrder = async () => {
+    try {
+      await createOrder(cart, totalPrice);
+      dispatch(clearCart());
+      alert("Order created");
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
     <section className="cart">
       <div className={styles.wrapper}>
@@ -75,7 +85,7 @@ function CartPage() {
             <div className={styles.ofer}>
               <h2>Ваших товарів</h2>
               <h3>На суму: {totalPrice} $</h3>
-              <Link to="/order" className={styles.btn__ofer}>
+              <Link to="/" className={styles.btn__ofer} onClick={handleOrder}>
                 Оформити
                 <img src={btnBg} alt="" />
               </Link>

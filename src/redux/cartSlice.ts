@@ -24,7 +24,6 @@ const cartSlice = createSlice({
     },
 
     removeFromCart(state, action: PayloadAction<number>) {
-
       const newState = state
         .map((el) =>
           el.item.id === action.payload ? { ...el, count: el.count - 1 } : el,
@@ -39,10 +38,15 @@ const cartSlice = createSlice({
       addToLocalStore("cart", newState);
       return newState;
     },
+    clearCart(state, action: PayloadAction) {
+      state = [];
+      addToLocalStore("cart", []);
+      return state;
+    },
   },
 });
 
-export const { addToCart, removeFromCart, removeAllFromCart } =
+export const { addToCart, removeFromCart, removeAllFromCart, clearCart } =
   cartSlice.actions;
 
 export default cartSlice.reducer;

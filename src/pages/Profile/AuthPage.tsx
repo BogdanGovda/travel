@@ -3,19 +3,30 @@ import { auth } from "@/firebase";
 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import type { User } from "firebase/auth";
+
 import { useEffect, useState } from "react";
 
 import styles from "./AuthPage.module.scss";
 
-export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(false);
+type AuthMode = "login" | "register";
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+type FormState = {
+  email: string;
+  password: string;
+};
+
+export default function AuthPage() {
+  const [mode, setMode] = useState<AuthMode>("login");
+
+  const [form, setForm] = useState<FormState>({
+    email: "",
+    password: "",
+  });
 
   const [user, setUser] = useState<User | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -26,11 +37,23 @@ export default function AuthPage() {
     return unsubscribe;
   }, []);
 
-  const handleModeSwitch = () => {
-    setIsLogin((prev) => !prev);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
 
-    setEmail("");
-    setPassword("");
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleModeSwitch = () => {
+    setMode((prev) => (prev === "login" ? "register" : "login"));
+
+    setForm({
+      email: "",
+      password: "",
+    });
+
     setError(null);
   };
 
@@ -41,20 +64,27 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        await loginUser(email, password);
+      if (mode === "login") {
+        await loginUser(form.email, form.password);
       } else {
-        await registerUser(email, password);
+        await registerUser(form.email, form.password);
       }
 
-      setEmail("");
-      setPassword("");
+      setForm({
+        email: "",
+        password: "",
+      });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
   };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -62,11 +92,14 @@ export default function AuthPage() {
       console.log(error);
     }
   };
+
   if (user) {
     return (
       <div className={styles.wrapper}>
         <div className={styles.logged}>
           <h1>You are logged in</h1>
+
+          <p>{user.email}</p>
 
           <button className={styles.form__btn} onClick={handleLogout}>
             Logout
@@ -79,11 +112,16 @@ export default function AuthPage() {
   return (
     <div className={styles.wrapper}>
       <form onSubmit={handleSubmit} className={styles.form}>
+        <h1 className={styles.form__title}>
+          {mode === "login" ? "Login" : "Register"}
+        </h1>
+
         <input
           className={styles.form__input}
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          name="email"
+          value={form.email}
+          onChange={handleChange}
           placeholder="Email"
           required
         />
@@ -91,8 +129,9 @@ export default function AuthPage() {
         <input
           className={styles.form__input}
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          name="password"
+          value={form.password}
+          onChange={handleChange}
           placeholder="Password"
           required
         />
@@ -100,7 +139,7 @@ export default function AuthPage() {
         {error && <p className={styles.form__error}>{error}</p>}
 
         <button className={styles.form__btn} type="submit" disabled={loading}>
-          {loading ? "Please wait..." : isLogin ? "Login" : "Register"}
+          {loading ? "Please wait..." : mode === "login" ? "Login" : "Register"}
         </button>
 
         <button
@@ -108,7 +147,7 @@ export default function AuthPage() {
           className={styles.form__toggle}
           onClick={handleModeSwitch}
         >
-          {isLogin
+          {mode === "login"
             ? "Don't have an account? Register"
             : "Already have an account? Login"}
         </button>

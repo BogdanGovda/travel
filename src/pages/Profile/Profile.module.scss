@@ -1,0 +1,95 @@
+.wrapper {
+  margin: 20px 250px 0 250px;
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.tabs {
+  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+
+  &__item {
+    background: none;
+    font-size: 25px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    border: 1px solid #956d84;
+    text-align: left;
+
+    &:hover {
+      color: white;
+      background-color: #956d84;
+      cursor: pointer;
+    }
+
+    &_active {
+      color: white;
+      background-color: #956d84;
+    }
+  }
+}
+
+.content {
+  flex: 1;
+  width: 80%;
+  min-width: 0;
+
+  &__panel {
+    width: 100%;
+  }
+}
+
+.message {
+  font-size: 18px;
+}
+
+.orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &__item {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border: 1px solid #956d84;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+}
+
+.profile {
+  margin: 0;
+  font-size: 18px;
+
+  dt {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  dd {
+    margin: 0 0 16px;
+  }
+}
+
+.logoutBtn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  font-size: 16px;
+  color: white;
+  background: #956d84;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+
+  &:hover {
+    background: #7d5c6f;
+  }
+}

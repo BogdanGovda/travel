@@ -1,6 +1,10 @@
+@use "@/styles/variables.scss" as *;
 .wrapper {
   padding: 0 150px;
   margin-top: 50px;
+  @include laptop {
+    padding: 0 5%;
+  }
 }
 
 .slider {

@@ -14,9 +14,25 @@ export const CustomSwiper = ({ children, ...props }: MySwiperProps) => {
   return (
     <Swiper
       modules={[Navigation, Autoplay]}
-      spaceBetween={80}
-      slidesPerView={3}
       loop={true}
+      breakpoints={{
+        0: {
+          slidesPerView: 1,
+          spaceBetween: 16,
+        },
+        480: {
+          slidesPerView: 2,
+          spaceBetween: 24,
+        },
+        768: {
+          slidesPerView: 3,
+          spaceBetween: 40,
+        },
+        1024: {
+          slidesPerView: 3,
+          spaceBetween: 80,
+        },
+      }}
       {...props}
     >
       {children}

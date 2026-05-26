@@ -1,13 +1,95 @@
+@use "@/styles/variables.scss" as *;
+
+$header-z: 100;
+$overlay-z: 99;
+$burger-line-gap: 7px;
+$burger-line-height: 3px;
+$burger-translate: $burger-line-gap + $burger-line-height;
+
+@mixin nav-mobile {
+  @include tablet {
+    @content;
+  }
+  @include mobile {
+    @content;
+  }
+}
+
+@mixin motion-safe {
+  @media (prefers-reduced-motion: no-preference) {
+    @content;
+  }
+}
+
+.headerOpen {
+  @include nav-mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: $header-z;
+    background-color: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    margin: 0;
+    padding: 20px 5% 16px;
+    overflow-y: auto;
+    height: 100%;
+  }
+}
+
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: $overlay-z;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  @include motion-safe {
+    transition:
+      opacity 0.3s ease,
+      visibility 0.3s ease;
+  }
+
+  @include nav-mobile {
+    display: block;
+  }
+}
+
+.overlayVisible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
 .wrapper {
   margin: 20px 250px 0 250px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @include desktop {
+    margin: 20px 5% 0 5%;
+  }
+  @include laptop {
+    margin: 20px 2% 0 5%;
+  }
+  @include nav-mobile {
+    flex-direction: column;
+    margin: 20px 2% 0 5%;
+  }
 }
 
 .list {
   display: flex;
   align-items: center;
+
   .link {
     margin: 1px 24px 1px 0;
     font-family: OpenSans;
@@ -15,12 +97,24 @@
     color: #333;
     text-decoration: none;
   }
+
+  @include nav-mobile {
+    flex-direction: column;
+  }
 }
 
 .logo {
   img {
     height: 115px;
     width: 129px;
+    max-width: none;
+  }
+
+  @include nav-mobile {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
@@ -32,6 +126,7 @@
 
   .list {
     gap: 10px;
+
     a {
       margin-right: 15px;
       color: #333;
@@ -39,17 +134,122 @@
       display: flex;
       align-items: center;
       gap: 10px;
+
+      svg {
+        height: 24px;
+        width: 24px;
+        max-width: none;
+      }
+
+      @include laptop {
+        font-size: 15px;
+        gap: 5px;
+      }
     }
   }
+
+  @include nav-mobile {
+    flex-direction: column;
+    align-items: center;
+  }
 }
+
 .modal {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 400;
+  width: 400px;
   background-color: #fff;
   border: 1px solid #000;
   box-shadow: 24px;
   padding: 4px;
+}
+
+@mixin mobile-menu-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-12px);
+
+  @include motion-safe {
+    transition:
+      max-height 0.4s ease,
+      opacity 0.3s ease,
+      transform 0.3s ease,
+      visibility 0.3s ease;
+  }
+
+  &.menuOpen {
+    gap: 16px;
+    padding-top: 16px;
+    max-height: 100%;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+    overflow-y: auto;
+    height: 500px;
+  }
+}
+
+.menu {
+  display: block;
+
+  @include nav-mobile {
+    @include mobile-menu-panel;
+  }
+}
+
+.burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: $burger-line-gap;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #333;
+
+  span {
+    display: block;
+    width: 100%;
+    height: $burger-line-height;
+    background-color: currentColor;
+    border-radius: 2px;
+    transform-origin: center;
+
+    @include motion-safe {
+      transition:
+        transform 0.3s ease,
+        opacity 0.2s ease;
+    }
+  }
+
+  @include nav-mobile {
+    display: flex;
+  }
+}
+
+.burgerOpen {
+  span:nth-child(1) {
+    transform: translateY($burger-translate) rotate(45deg);
+  }
+
+  span:nth-child(2) {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+
+  span:nth-child(3) {
+    transform: translateY(-$burger-translate) rotate(-45deg);
+  }
 }

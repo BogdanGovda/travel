@@ -40,7 +40,7 @@ export default function FavoriteModal() {
 
   return (
     <div>
-      <button onClick={handleOpen}>
+      <button onClick={handleOpen} className={styles.modal__open}>
         <MdFavorite></MdFavorite>
         {favorite.length}
       </button>

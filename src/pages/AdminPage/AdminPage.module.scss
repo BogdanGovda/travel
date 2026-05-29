@@ -1,0 +1,182 @@
+.section {
+  padding: 24px;
+}
+
+.content {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  border: 1px solid #d0d4dc;
+  background: #f7f8fa;
+  color: #1f2937;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tab:hover {
+  background: #eceff4;
+}
+
+.tabActive {
+  background: #1f2937;
+  color: #fff;
+  border-color: #1f2937;
+}
+
+.panel {
+  border: 1px solid #d0d4dc;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  min-height: 120px;
+}
+
+.emptyState {
+  margin: 0;
+  color: #4b5563;
+}
+
+.error {
+  margin: 0;
+  color: #b91c1c;
+}
+
+.ordersList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.orderItem {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  align-items: center;
+}
+
+.orderMeta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.orderStatusView,
+.orderStatusEdit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.orderStatusEdit .input {
+  width: auto;
+  min-width: 110px;
+}
+
+.orderProducts {
+  border-top: 1px dashed #d1d5db;
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.orderProductItem {
+  display: grid;
+  grid-template-columns: 1.3fr auto auto auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.productsLayout {
+  display: grid;
+  gap: 12px;
+}
+
+.productActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+  }
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.checkboxRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.submitBtn {
+  border: 1px solid #1f2937;
+  background: #1f2937;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.dangerBtn {
+  border: 1px solid #b91c1c;
+  background: #b91c1c;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.productList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.productItem {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}

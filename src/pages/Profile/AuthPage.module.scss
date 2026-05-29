@@ -1,8 +1,12 @@
+@use "@/styles/variables.scss" as *;
 .wrapper {
   margin: 20px 250px 0 250px;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  @include phone {
+    margin: 20px 2% 0 5%;
+  }
 }
 
 .form {
@@ -31,6 +35,16 @@
     border-radius: 20px;
     &:hover {
       background: #7d5c6f;
+      cursor: pointer;
+    }
+  }
+}
+
+.logged {
+  h2 {
+    color: #7d5c6f;
+    &:hover {
+      color: #b585a0;
       cursor: pointer;
     }
   }

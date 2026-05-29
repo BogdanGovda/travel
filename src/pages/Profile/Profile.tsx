@@ -5,6 +5,8 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import styles from "./Profile.module.scss";
+import { MdLabel } from "react-icons/md";
+import AdminPage from "../AdminPage/AdminPage";
 
 type UserOrder = {
   id: string;
@@ -12,7 +14,7 @@ type UserOrder = {
   status?: string;
   items?: CartItem[];
 };
-
+const isAdmin = true;
 interface TabPanelProps {
   children: React.ReactNode;
   index: number;
@@ -101,7 +103,11 @@ export default function ProfilePage() {
     );
   }
 
-  const tabs = [{ label: "Мої замовлення" }, { label: "Мій профіль" }] as const;
+  const tabs = [
+    { label: "Мої замовлення" },
+    { label: "Мій профіль" },
+    ...(isAdmin ? [{ label: "Панель" }] : []),
+  ] as const;
 
   return (
     <div className={styles.wrapper}>
@@ -154,6 +160,9 @@ export default function ProfilePage() {
           >
             Вийти
           </button>
+        </TabPanel>
+        <TabPanel value={activeTab} index={2}>
+          <AdminPage></AdminPage>
         </TabPanel>
       </div>
     </div>

@@ -7,6 +7,7 @@ import type { User } from "firebase/auth";
 import { useEffect, useState } from "react";
 
 import styles from "./AuthPage.module.scss";
+import { Link } from "react-router-dom";
 
 type AuthMode = "login" | "register";
 
@@ -97,13 +98,10 @@ export default function AuthPage() {
     return (
       <div className={styles.wrapper}>
         <div className={styles.logged}>
-          <h1>You are logged in</h1>
-
-          <p>{user.email}</p>
-
-          <button className={styles.form__btn} onClick={handleLogout}>
-            Logout
-          </button>
+          <h1>Ви успішно залогінені</h1>
+          <h2>
+            <Link to="/profile">Переглянути свій профіль</Link>
+          </h2>
         </div>
       </div>
     );

@@ -5,11 +5,20 @@
   @include laptop {
     padding: 0 5%;
   }
+  @include phone {
+    padding: 0 5%;
+  }
 }
 
 .slider {
   padding: 20px 150px;
 
+  @include phone {
+    padding: 20px 0;
+  }
+  @include laptop {
+    padding: 20px 0;
+  }
   :global(.swiper-button-prev) {
     background: #99d599;
     border-radius: 50%;

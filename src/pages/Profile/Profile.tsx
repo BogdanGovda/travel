@@ -1,12 +1,20 @@
 import { getUserOrders } from "@/shared/api/orderApi";
+import { getOrderStatusLabel } from "@/shared/orderStatus";
 import type { CartItem } from "@/shared/types";
-import { auth } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/firebase";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import styles from "./Profile.module.scss";
-import { MdLabel } from "react-icons/md";
 import AdminPage from "../AdminPage/AdminPage";
+
+const ADMIN_TAB_INDEX = 2;
+
+const checkIsAdmin = async (uid: string): Promise<boolean> => {
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.data()?.isAdmin === true;
+};
 
 type UserOrder = {
   id: string;
@@ -14,7 +22,7 @@ type UserOrder = {
   status?: string;
   items?: CartItem[];
 };
-const isAdmin = true;
+
 interface TabPanelProps {
   children: React.ReactNode;
   index: number;
@@ -48,6 +56,9 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -59,12 +70,53 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) {
+      setIsAdmin(false);
+      setAdminLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAdminLoading(true);
+
+    checkIsAdmin(user.uid)
+      .then((admin) => {
+        if (!cancelled) {
+          setIsAdmin(admin);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) {
+          setIsAdmin(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAdminLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === ADMIN_TAB_INDEX) {
+      setActiveTab(0);
+    }
+  }, [isAdmin, activeTab]);
+
+  useEffect(() => {
+    if (!user) {
       setOrders([]);
+      setOrdersError("");
       return;
     }
 
     let cancelled = false;
     setOrdersLoading(true);
+    setOrdersError("");
 
     getUserOrders()
       .then((data) => {
@@ -72,7 +124,12 @@ export default function ProfilePage() {
           setOrders(data as UserOrder[]);
         }
       })
-      .catch(console.error)
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) {
+          setOrdersError("Не вдалося завантажити замовлення.");
+        }
+      })
       .finally(() => {
         if (!cancelled) {
           setOrdersLoading(false);
@@ -104,9 +161,9 @@ export default function ProfilePage() {
   }
 
   const tabs = [
-    { label: "Мої замовлення" },
-    { label: "Мій профіль" },
-    ...(isAdmin ? [{ label: "Панель" }] : []),
+    { id: "orders", label: "Мої замовлення" },
+    { id: "profile", label: "Мій профіль" },
+    ...(isAdmin ? [{ id: "admin", label: "Панель" }] : []),
   ] as const;
 
   return (
@@ -114,7 +171,7 @@ export default function ProfilePage() {
       <div className={styles.tabs} role="tablist" aria-label="Профіль">
         {tabs.map((tab, index) => (
           <button
-            key={tab.label}
+            key={tab.id}
             type="button"
             role="tab"
             className={`${styles.tabs__item} ${
@@ -133,15 +190,38 @@ export default function ProfilePage() {
         <TabPanel value={activeTab} index={0}>
           {ordersLoading ? (
             <p className={styles.message}>Завантаження замовлень…</p>
+          ) : ordersError ? (
+            <p className={styles.error}>{ordersError}</p>
           ) : orders.length === 0 ? (
             <p className={styles.message}>У вас ще немає замовлень.</p>
           ) : (
             <ul className={styles.orders}>
               {orders.map((order) => (
                 <li key={order.id} className={styles.orders__item}>
-                  <span>№ {order.id.slice(0, 8)}</span>
-                  <span>{order.status ?? "pending"}</span>
-                  <span>{order.totalPrice ?? 0} ₴</span>
+                  <div className={styles.orders__meta}>
+                    <span>№ {order.id.slice(0, 8)}</span>
+                    <span>{getOrderStatusLabel(order.status)}</span>
+                    <span>{order.totalPrice ?? 0} ₴</span>
+                  </div>
+                  {(order.items ?? []).length > 0 && (
+                    <ul className={styles.orders__products}>
+                      {(order.items ?? []).map((line, index) => (
+                        <li
+                          key={`${order.id}-${line.item?.id ?? index}`}
+                          className={styles.orders__product}
+                        >
+                          <span>{line.item?.title ?? "Товар"}</span>
+                          <span>x{line.count}</span>
+                          <span>
+                            {line.item?.promotion
+                              ? (line.item.promotionPrice ?? 0)
+                              : (line.item?.price ?? 0)}{" "}
+                            ₴
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
@@ -156,14 +236,17 @@ export default function ProfilePage() {
           <button
             type="button"
             className={styles.logoutBtn}
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
           >
             Вийти
           </button>
         </TabPanel>
-        <TabPanel value={activeTab} index={2}>
-          <AdminPage></AdminPage>
-        </TabPanel>
+
+        {isAdmin && !adminLoading && (
+          <TabPanel value={activeTab} index={ADMIN_TAB_INDEX}>
+            <AdminPage />
+          </TabPanel>
+        )}
       </div>
     </div>
   );

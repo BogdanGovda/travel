@@ -12,15 +12,17 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import type { CartItem, Tour } from "@/shared/types";
+import {
+  ORDER_STATUSES,
+  ORDER_STATUS_LABELS,
+  type OrderStatus,
+} from "@/shared/orderStatus";
 
 const TABS = [
   { id: "overview", label: "Огляд" },
   { id: "orders", label: "Замовлення" },
   { id: "products", label: "Товари" },
 ] as const;
-
-const ORDER_STATUSES = ["pending", "progress", "done"] as const;
-type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 type TabId = (typeof TABS)[number]["id"];
 type AdminOrder = {
@@ -34,28 +36,98 @@ type ProductEntity = Tour & {
   firestoreId: string;
 };
 
+type ProductFormState = {
+  title: string;
+  img: string;
+  price: string;
+  promotion: boolean;
+  promotionPrice: string;
+};
+
+const EMPTY_PRODUCT_FORM: ProductFormState = {
+  title: "",
+  img: "",
+  price: "",
+  promotion: false,
+  promotionPrice: "",
+};
+
+const mapDocToProduct = (
+  productDoc: { id: string; data: () => unknown },
+  index: number,
+): ProductEntity => {
+  const data = productDoc.data() as Partial<Tour>;
+  const promotion = Boolean(data.promotion);
+
+  return {
+    firestoreId: productDoc.id,
+    id: typeof data.id === "number" ? data.id : index + 1,
+    title: String(data.title ?? ""),
+    img: String(data.img ?? ""),
+    price: Number(data.price ?? 0),
+    promotion,
+    ...(promotion && {
+      promotionPrice: Number(data.promotionPrice ?? 0),
+    }),
+  };
+};
+
+const fetchProducts = async (): Promise<ProductEntity[]> => {
+  const snapshot = await getDocs(collection(db, "itemList"));
+  return snapshot.docs.map((productDoc, index) =>
+    mapDocToProduct(productDoc, index),
+  );
+  //return snapshot.docs.map(mapDocToProduct);
+};
+
+const isValidProductForm = (form: ProductFormState): boolean => {
+  const price = Number(form.price);
+  if (
+    !form.title.trim() ||
+    !form.img.trim() ||
+    Number.isNaN(price) ||
+    price < 0
+  ) {
+    return false;
+  }
+  if (form.promotion) {
+    const promotionPrice = Number(form.promotionPrice);
+    if (Number.isNaN(promotionPrice) || promotionPrice < 0) {
+      return false;
+    }
+  }
+  return true;
+};
+
+function tabA11yProps(tabId: TabId) {
+  return {
+    id: `admin-tab-${tabId}`,
+    "aria-controls": `admin-tabpanel-${tabId}`,
+  };
+}
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [ordersError, setOrdersError] = useState("");
 
-  const [createProduct, setCreateProduct] = useState({
-    title: "",
-    img: "",
-    price: "",
-    promotion: false,
-    promotionPrice: "",
+  const [overviewStats, setOverviewStats] = useState({
+    orders: 0,
+    products: 0,
+    pendingOrders: 0,
   });
-  const [editProduct, setEditProduct] = useState({
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
+
+  const [createProduct, setCreateProduct] =
+    useState<ProductFormState>(EMPTY_PRODUCT_FORM);
+  const [editProduct, setEditProduct] = useState<
+    ProductFormState & { id: string }
+  >({
     id: "",
-    title: "",
-    img: "",
-    price: "",
-    promotion: false,
-    promotionPrice: "",
+    ...EMPTY_PRODUCT_FORM,
   });
-  const [deleteProductId, setDeleteProductId] = useState("");
   const [products, setProducts] = useState<ProductEntity[]>([]);
   const [productsError, setProductsError] = useState("");
   const [productsLoading, setProductsLoading] = useState(false);
@@ -79,9 +151,9 @@ export default function AdminPage() {
           orderBy("createdAt", "desc"),
         );
         const snapshot = await getDocs(ordersQuery);
-        const allOrders = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const allOrders = snapshot.docs.map((orderDoc) => ({
+          id: orderDoc.id,
+          ...orderDoc.data(),
         })) as AdminOrder[];
 
         if (!cancelled) {
@@ -106,27 +178,57 @@ export default function AdminPage() {
     };
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== "overview") return;
+
+    let cancelled = false;
+    setOverviewLoading(true);
+    setOverviewError("");
+
+    const loadOverview = async () => {
+      try {
+        const [ordersSnapshot, productsSnapshot] = await Promise.all([
+          getDocs(collection(db, "orders")),
+          getDocs(collection(db, "itemList")),
+        ]);
+
+        if (cancelled) return;
+
+        const pendingOrders = ordersSnapshot.docs.filter((orderDoc) => {
+          const status =
+            (orderDoc.data().status as string | undefined) ?? "pending";
+          return status === "pending";
+        }).length;
+
+        setOverviewStats({
+          orders: ordersSnapshot.size,
+          products: productsSnapshot.size,
+          pendingOrders,
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          setOverviewError("Не вдалося завантажити статистику.");
+        }
+      } finally {
+        if (!cancelled) {
+          setOverviewLoading(false);
+        }
+      }
+    };
+
+    void loadOverview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
   const loadProducts = async () => {
     setProductsLoading(true);
     setProductsError("");
     try {
-      const snapshot = await getDocs(collection(db, "itemList"));
-      const loaded = snapshot.docs.map((productDoc, index) => {
-        const data = productDoc.data() as Partial<Tour>;
-        return {
-          firestoreId: productDoc.id,
-          id: typeof data.id === "number" ? data.id : index + 1,
-          title: String(data.title ?? ""),
-          img: String(data.img ?? ""),
-          price: Number(data.price ?? 0),
-          promotion: Boolean(data.promotion),
-          promotionPrice:
-            typeof data.promotionPrice === "number"
-              ? data.promotionPrice
-              : undefined,
-        };
-      });
-      setProducts(loaded);
+      setProducts(await fetchProducts());
     } catch (error) {
       console.error(error);
       setProductsError("Не вдалося завантажити товари.");
@@ -136,13 +238,41 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "products") {
-      void loadProducts();
-    }
+    if (activeTab !== "products") return;
+
+    let cancelled = false;
+    setProductsLoading(true);
+    setProductsError("");
+
+    void (async () => {
+      try {
+        const loaded = await fetchProducts();
+        if (!cancelled) {
+          setProducts(loaded);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          setProductsError("Не вдалося завантажити товари.");
+        }
+      } finally {
+        if (!cancelled) {
+          setProductsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab]);
 
   const handleCreateProduct = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isValidProductForm(createProduct)) {
+      setProductsError("Заповніть усі поля коректно.");
+      return;
+    }
     try {
       await addDoc(collection(db, "itemList"), {
         title: createProduct.title.trim(),
@@ -153,13 +283,7 @@ export default function AdminPage() {
           promotionPrice: Number(createProduct.promotionPrice),
         }),
       });
-      setCreateProduct({
-        title: "",
-        img: "",
-        price: "",
-        promotion: false,
-        promotionPrice: "",
-      });
+      setCreateProduct(EMPTY_PRODUCT_FORM);
       setShowAddForm(false);
       await loadProducts();
     } catch (error) {
@@ -170,7 +294,10 @@ export default function AdminPage() {
 
   const handleEditProduct = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editProduct.id.trim()) return;
+    if (!editProduct.id.trim() || !isValidProductForm(editProduct)) {
+      setProductsError("Заповніть усі поля коректно.");
+      return;
+    }
     try {
       await updateDoc(doc(db, "itemList", editProduct.id.trim()), {
         title: editProduct.title.trim(),
@@ -181,14 +308,7 @@ export default function AdminPage() {
           ? Number(editProduct.promotionPrice)
           : null,
       });
-      setEditProduct({
-        id: "",
-        title: "",
-        img: "",
-        price: "",
-        promotion: false,
-        promotionPrice: "",
-      });
+      setEditProduct({ id: "", ...EMPTY_PRODUCT_FORM });
       setShowEditForm(false);
       await loadProducts();
     } catch (error) {
@@ -197,12 +317,18 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteProduct = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!deleteProductId.trim()) return;
+  const handleDeleteProduct = async (firestoreId: string, title: string) => {
+    const confirmed = window.confirm(
+      `Видалити товар «${title}»? Цю дію не можна скасувати.`,
+    );
+    if (!confirmed) return;
+
     try {
-      await deleteDoc(doc(db, "itemList", deleteProductId.trim()));
-      setDeleteProductId("");
+      await deleteDoc(doc(db, "itemList", firestoreId));
+      if (editProduct.id === firestoreId) {
+        setEditProduct({ id: "", ...EMPTY_PRODUCT_FORM });
+        setShowEditForm(false);
+      }
       await loadProducts();
     } catch (error) {
       console.error(error);
@@ -242,6 +368,22 @@ export default function AdminPage() {
     }
   };
 
+  const openProductEdit = (product: ProductEntity) => {
+    setShowEditForm(true);
+    setShowAddForm(false);
+    setEditProduct({
+      id: product.firestoreId,
+      title: product.title,
+      img: product.img,
+      price: String(product.price),
+      promotion: product.promotion,
+      promotionPrice:
+        product.promotionPrice !== undefined
+          ? String(product.promotionPrice)
+          : "",
+    });
+  };
+
   return (
     <section className={styles.section}>
       <div className={styles.content}>
@@ -260,15 +402,57 @@ export default function AdminPage() {
               aria-selected={activeTab === tab.id}
               className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
               onClick={() => setActiveTab(tab.id)}
+              {...tabA11yProps(tab.id)}
             >
               {tab.label}
             </button>
           ))}
         </div>
 
-        <div className={styles.panel} role="tabpanel">
-          {activeTab === "overview" &&
-            "Коротка статистика та загальна інформація по сайту."}
+        <div
+          className={styles.panel}
+          role="tabpanel"
+          id={`admin-tabpanel-${activeTab}`}
+          aria-labelledby={`admin-tab-${activeTab}`}
+        >
+          {activeTab === "overview" && (
+            <>
+              {overviewLoading && (
+                <p className={styles.emptyState}>Завантаження статистики...</p>
+              )}
+              {!overviewLoading && overviewError && (
+                <p className={styles.error}>{overviewError}</p>
+              )}
+              {!overviewLoading && !overviewError && (
+                <ul className={styles.overviewStats}>
+                  <li className={styles.overviewStat}>
+                    <span className={styles.overviewStatValue}>
+                      {overviewStats.orders}
+                    </span>
+                    <span className={styles.overviewStatLabel}>
+                      Усього замовлень
+                    </span>
+                  </li>
+                  <li className={styles.overviewStat}>
+                    <span className={styles.overviewStatValue}>
+                      {overviewStats.pendingOrders}
+                    </span>
+                    <span className={styles.overviewStatLabel}>
+                      Очікують обробки
+                    </span>
+                  </li>
+                  <li className={styles.overviewStat}>
+                    <span className={styles.overviewStatValue}>
+                      {overviewStats.products}
+                    </span>
+                    <span className={styles.overviewStatLabel}>
+                      Товарів у каталозі
+                    </span>
+                  </li>
+                </ul>
+              )}
+            </>
+          )}
 
           {activeTab === "orders" && (
             <>
@@ -288,7 +472,7 @@ export default function AdminPage() {
                     <li key={order.id} className={styles.orderItem}>
                       <div className={styles.orderMeta}>
                         <span>№ {order.id.slice(0, 8)}</span>
-                        <span>{order.userEmail ?? "no-email"}</span>
+                        <span>{order.userEmail ?? "—"}</span>
                         {editingOrderId === order.id ? (
                           <div className={styles.orderStatusEdit}>
                             <select
@@ -302,7 +486,7 @@ export default function AdminPage() {
                             >
                               {ORDER_STATUSES.map((status) => (
                                 <option key={status} value={status}>
-                                  {status}
+                                  {ORDER_STATUS_LABELS[status]}
                                 </option>
                               ))}
                             </select>
@@ -316,7 +500,7 @@ export default function AdminPage() {
                               Зберегти
                             </button>
                             <button
-                              className={styles.tab}
+                              className={styles.cancelBtn}
                               type="button"
                               onClick={cancelOrderStatusEdit}
                             >
@@ -325,16 +509,16 @@ export default function AdminPage() {
                           </div>
                         ) : (
                           <div className={styles.orderStatusView}>
-                            <span>{getOrderStatus(order)}</span>
-                            {
-                              <button
-                                className={styles.submitBtn}
-                                type="button"
-                                onClick={() => startOrderStatusEdit(order)}
-                              >
-                                Редагувати
-                              </button>
-                            }
+                            <span>
+                              {ORDER_STATUS_LABELS[getOrderStatus(order)]}
+                            </span>
+                            <button
+                              className={styles.submitBtn}
+                              type="button"
+                              onClick={() => startOrderStatusEdit(order)}
+                            >
+                              Редагувати
+                            </button>
                           </div>
                         )}
                         <span>{order.totalPrice ?? 0} ₴</span>
@@ -343,7 +527,7 @@ export default function AdminPage() {
                       <div className={styles.orderProducts}>
                         {(order.items ?? []).map((productLine, index) => (
                           <div
-                            key={`${order.id}-${index}`}
+                            key={`${order.id}-${productLine.item?.id ?? index}`}
                             className={styles.orderProductItem}
                           >
                             <span>{productLine.item?.title ?? "Товар"}</span>
@@ -375,17 +559,7 @@ export default function AdminPage() {
                     if (showEditForm) setShowEditForm(false);
                   }}
                 >
-                  Додати продукт
-                </button>
-                <button
-                  className={styles.submitBtn}
-                  type="button"
-                  onClick={() => {
-                    setShowEditForm((prev) => !prev);
-                    if (showAddForm) setShowAddForm(false);
-                  }}
-                >
-                  Редагувати
+                  {showAddForm ? "Сховати форму" : "Додати товар"}
                 </button>
               </div>
 
@@ -408,10 +582,11 @@ export default function AdminPage() {
                         title: event.target.value,
                       }))
                     }
+                    required
                   />
                   <input
                     className={styles.input}
-                    type="text"
+                    type="url"
                     placeholder="URL зображення"
                     value={createProduct.img}
                     onChange={(event) =>
@@ -420,10 +595,12 @@ export default function AdminPage() {
                         img: event.target.value,
                       }))
                     }
+                    required
                   />
                   <input
                     className={styles.input}
                     type="number"
+                    min={0}
                     placeholder="Ціна"
                     value={createProduct.price}
                     onChange={(event) =>
@@ -432,6 +609,7 @@ export default function AdminPage() {
                         price: event.target.value,
                       }))
                     }
+                    required
                   />
                   <label className={styles.checkboxRow}>
                     <input
@@ -453,6 +631,7 @@ export default function AdminPage() {
                     <input
                       className={styles.input}
                       type="number"
+                      min={0}
                       placeholder="Акційна ціна"
                       value={createProduct.promotionPrice}
                       onChange={(event) =>
@@ -461,6 +640,7 @@ export default function AdminPage() {
                           promotionPrice: event.target.value,
                         }))
                       }
+                      required
                     />
                   )}
                   <button className={styles.submitBtn} type="submit">
@@ -475,19 +655,7 @@ export default function AdminPage() {
                   <input
                     className={styles.input}
                     type="text"
-                    placeholder=" ID товару"
-                    value={editProduct.id}
-                    onChange={(event) =>
-                      setEditProduct((prev) => ({
-                        ...prev,
-                        id: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    className={styles.input}
-                    type="text"
-                    placeholder="Нова назва"
+                    placeholder="Назва"
                     value={editProduct.title}
                     onChange={(event) =>
                       setEditProduct((prev) => ({
@@ -495,11 +663,12 @@ export default function AdminPage() {
                         title: event.target.value,
                       }))
                     }
+                    required
                   />
                   <input
                     className={styles.input}
-                    type="text"
-                    placeholder="Нове URL зображення"
+                    type="url"
+                    placeholder="URL зображення"
                     value={editProduct.img}
                     onChange={(event) =>
                       setEditProduct((prev) => ({
@@ -507,11 +676,13 @@ export default function AdminPage() {
                         img: event.target.value,
                       }))
                     }
+                    required
                   />
                   <input
                     className={styles.input}
                     type="number"
-                    placeholder="Нова ціна"
+                    min={0}
+                    placeholder="Ціна"
                     value={editProduct.price}
                     onChange={(event) =>
                       setEditProduct((prev) => ({
@@ -519,6 +690,7 @@ export default function AdminPage() {
                         price: event.target.value,
                       }))
                     }
+                    required
                   />
                   <label className={styles.checkboxRow}>
                     <input
@@ -540,7 +712,8 @@ export default function AdminPage() {
                     <input
                       className={styles.input}
                       type="number"
-                      placeholder="promotionPrice"
+                      min={0}
+                      placeholder="Акційна ціна"
                       value={editProduct.promotionPrice}
                       onChange={(event) =>
                         setEditProduct((prev) => ({
@@ -548,27 +721,26 @@ export default function AdminPage() {
                           promotionPrice: event.target.value,
                         }))
                       }
+                      required
                     />
                   )}
-                  <button className={styles.submitBtn} type="submit">
-                    Зберегти
-                  </button>
+                  <div className={styles.productItemActions}>
+                    <button className={styles.submitBtn} type="submit">
+                      Зберегти
+                    </button>
+                    <button
+                      className={styles.cancelBtn}
+                      type="button"
+                      onClick={() => {
+                        setShowEditForm(false);
+                        setEditProduct({ id: "", ...EMPTY_PRODUCT_FORM });
+                      }}
+                    >
+                      Скасувати
+                    </button>
+                  </div>
                 </form>
               )}
-
-              <form className={styles.formCard} onSubmit={handleDeleteProduct}>
-                <h2>Видалити товар</h2>
-                <input
-                  className={styles.input}
-                  type="text"
-                  placeholder="ID товару"
-                  value={deleteProductId}
-                  onChange={(event) => setDeleteProductId(event.target.value)}
-                />
-                <button className={styles.dangerBtn} type="submit">
-                  Видалити
-                </button>
-              </form>
 
               {productsLoading ? (
                 <p className={styles.emptyState}>Завантаження товарів...</p>
@@ -587,27 +759,27 @@ export default function AdminPage() {
                         {product.promotion &&
                           ` (${product.promotionPrice ?? 0} ₴)`}
                       </span>
-                      <button
-                        className={styles.submitBtn}
-                        type="button"
-                        onClick={() => {
-                          setShowEditForm(true);
-                          setShowAddForm(false);
-                          setEditProduct({
-                            id: product.firestoreId,
-                            title: product.title,
-                            img: product.img,
-                            price: String(product.price),
-                            promotion: product.promotion,
-                            promotionPrice:
-                              product.promotionPrice !== undefined
-                                ? String(product.promotionPrice)
-                                : "",
-                          });
-                        }}
-                      >
-                        Редагувати
-                      </button>
+                      <div className={styles.productItemActions}>
+                        <button
+                          className={styles.submitBtn}
+                          type="button"
+                          onClick={() => openProductEdit(product)}
+                        >
+                          Редагувати
+                        </button>
+                        <button
+                          className={styles.dangerBtn}
+                          type="button"
+                          onClick={() =>
+                            void handleDeleteProduct(
+                              product.firestoreId,
+                              product.title,
+                            )
+                          }
+                        >
+                          Видалити
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

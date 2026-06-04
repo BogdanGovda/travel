@@ -1,5 +1,10 @@
+@use "@/styles/variables.scss" as *;
+
 .section {
   padding: 24px;
+  @include phone {
+    padding: 0;
+  }
 }
 
 .content {
@@ -80,6 +85,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  @include mobile {
+    grid-template-columns: auto;
+  }
 }
 
 .orderStatusView,
@@ -154,6 +162,53 @@
   border-radius: 8px;
   padding: 8px 10px;
   cursor: pointer;
+}
+
+.cancelBtn {
+  border: 1px solid #d0d4dc;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: #f7f8fa;
+}
+
+.overviewStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overviewStat {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.overviewStatValue {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.overviewStatLabel {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.productItemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .dangerBtn {

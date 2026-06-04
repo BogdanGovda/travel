@@ -1,8 +1,21 @@
+@use "@/styles/variables.scss" as *;
 .wrapper {
   margin: 20px 250px 0 250px;
   display: flex;
   gap: 40px;
   align-items: flex-start;
+  @include laptop {
+    margin: 20px 5% 0 5%;
+  }
+  @include tablet {
+    margin: 20px 5% 0 5%;
+  }
+
+  @include phone {
+    margin: 20px 5% 0 5%;
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .tabs {
@@ -46,6 +59,12 @@
   font-size: 18px;
 }
 
+.error {
+  margin: 0;
+  font-size: 18px;
+  color: #b91c1c;
+}
+
 .orders {
   list-style: none;
   margin: 0;
@@ -55,13 +74,36 @@
   gap: 12px;
 
   &__item {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
+    display: grid;
+    gap: 10px;
     padding: 12px 16px;
     border: 1px solid #956d84;
     border-radius: 10px;
     font-size: 16px;
+  }
+
+  &__meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__products {
+    list-style: none;
+    margin: 0;
+    padding: 8px 0 0;
+    border-top: 1px dashed #c9a8b8;
+    display: grid;
+    gap: 6px;
+  }
+
+  &__product {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    color: #4b5563;
   }
 }
 

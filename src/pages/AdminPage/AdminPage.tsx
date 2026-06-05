@@ -244,23 +244,7 @@ export default function AdminPage() {
     setProductsLoading(true);
     setProductsError("");
 
-    void (async () => {
-      try {
-        const loaded = await fetchProducts();
-        if (!cancelled) {
-          setProducts(loaded);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error(error);
-          setProductsError("Не вдалося завантажити товари.");
-        }
-      } finally {
-        if (!cancelled) {
-          setProductsLoading(false);
-        }
-      }
-    })();
+    void (async () => loadProducts())();
 
     return () => {
       cancelled = true;

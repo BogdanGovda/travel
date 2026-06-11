@@ -1,0 +1,262 @@
+https://www.youtube.com/watch?v=TlB_eWDSMt4
+
+Базова теорія
+Розумійте фази Node event loop і де блокуючий код б'є по throughput.
+Використовуйте strict-налаштування TypeScript для раннього виявлення проблем контрактів.
+Знайте різницю ESM та CommonJS і поведінку module resolution.
+Проєктуйте чіткі межі між доменною логікою та HTTP-рівнем.
+Використовуйте конфігурацію за середовищем з валідацією схеми.
+
+
+
+Повна теорія з прикладами коду
+Event loop детально
+Event loop має фази: timers (setTimeout/setInterval), I/O callbacks, idle/prepare, poll (очікування I/O), check (setImmediate), close callbacks.
+
+process.nextTick() виконується перед будь-яким I/O, перед наступною фазою event loop. Використовуйте обережно.
+
+Promise мікрозадачі виконуються після кожного завдання в стеку, перед наступною фазою event loop.
+
+Порядок виконання: стек, мікрозадачі, макрозадачі
+// What is the output order?
+console.log("1 — synchronous");
+
+setTimeout(() => console.log("5 — macrotask (setTimeout)"), 0);
+
+Promise.resolve()
+  .then(() => console.log("3 — microtask (Promise)"))
+  .then(() => console.log("4 — microtask chained"));
+
+process.nextTick(() => console.log("2 — nextTick (before microtasks)"));
+
+console.log("1b — synchronous");
+
+// Output order:
+// 1 — synchronous
+// 1b — synchronous
+// 2 — nextTick (before microtasks)
+// 3 — microtask (Promise)
+// 4 — microtask chained
+// 5 — macrotask (setTimeout)
+Патерни системи типів TypeScript для API
+Branded types запобігають змішуванню структурно ідентичних але семантично різних значень (UserId vs OrderId).
+
+Generic constraints обмежують які типи приймає generic: T extends object означає що primitives відхиляються.
+
+Conditional types вмикають обчислення на рівні типів: NonNullable<T> видаляє null та undefined з union.
+
+Просунуті патерни TypeScript
+// Branded types — prevent mixing IDs
+type UserId  = string & { readonly __brand: "UserId" };
+type OrderId = string & { readonly __brand: "OrderId" };
+
+function getUser(id: UserId) { /* ... */ }
+const orderId = "order-123" as OrderId;
+// getUser(orderId);  // TypeScript error — good!
+
+// Discriminated union for API responses
+type ApiResult<T> =
+  | { success: true;  data: T }
+  | { success: false; error: string; code: number };
+
+function handleResult<T>(result: ApiResult<T>) {
+  if (result.success) {
+    return result.data;  // T — TypeScript knows
+  }
+  throw new Error(`${result.code}: ${result.error}`);
+}
+
+// Utility type compositions
+type CreateUserDto = Pick<User, "name" | "email">;
+type UpdateUserDto = Partial<Pick<User, "name" | "email">>;
+type UserResponse  = Omit<User, "passwordHash">;
+
+// Deep readonly for immutable config
+type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+Патерни обробки помилок у TypeScript
+Патерн Result: повертайте Success | Failure замість throwing. Обробка помилок стає явною на місці виклику.
+
+Власні класи помилок зі статус-кодами вмикають централізоване форматування в Express middleware.
+
+Ніколи не перехоплюйте помилки без логування. Мінімум — залогуйте перед повторним підніманням.
+
+Власні помилки та Express error middleware
+// Custom error hierarchy
+class AppError extends Error {
+  constructor(
+    public readonly message: string,
+    public readonly statusCode: number = 500,
+    public readonly code: string = "INTERNAL_ERROR",
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super(`${resource} not found`, 404, "NOT_FOUND");
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(message: string) {
+    super(message, 422, "VALIDATION_ERROR");
+  }
+}
+
+// Express global error middleware
+import { Request, Response, NextFunction } from "express";
+
+export function errorMiddleware(
+  err: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      error: err.code,
+      message: err.message,
+    });
+  }
+  // Unexpected error — log full details, return safe message
+  console.error("Unhandled error", { err, path: req.path });
+  res.status(500).json({ error: "INTERNAL_ERROR", message: "Internal server error" });
+}
+tsconfig.json для production backend
+strict: true вмикає всі суворі перевірки одразу. Обов'язково для нових проектів.
+
+Target ES2022 або пізніше для top-level await, нативних полів класу та Array.at().
+
+Використовуйте paths для уникнення глибоких відносних імпортів: @/services → src/services.
+
+tsconfig.json для Node.js backend
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    // Strict checks — all enabled
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Path aliases
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+
+    // Output
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+
+    // Safety
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
+Валідація під час виконання з Zod
+Типи TypeScript стираються під час виконання. Zod для валідації зовнішніх даних (тіла запитів, відповіді API, env) під час виконання.
+
+Zod виводить TypeScript типи зі схем: z.infer<typeof schema> дає тип без дублювання.
+
+Використовуйте safeParse коли хочете обробити помилки валідації без throwing.
+
+Zod валідація в Express та env
+import { z } from "zod";
+
+// Request body schema
+const CreateUserSchema = z.object({
+  name:  z.string().min(2).max(100).trim(),
+  email: z.string().email().toLowerCase(),
+  age:   z.number().int().min(18).max(120),
+  role:  z.enum(["user", "admin"]).default("user"),
+});
+
+type CreateUserDto = z.infer<typeof CreateUserSchema>;
+
+// Express middleware using Zod
+function validateBody<T extends z.ZodTypeAny>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(422).json({
+        error: "VALIDATION_ERROR",
+        details: result.error.flatten().fieldErrors,
+      });
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+// Usage
+router.post("/users", validateBody(CreateUserSchema), async (req, res) => {
+  const dto: CreateUserDto = req.body;  // fully typed and validated
+  const user = await userService.create(dto);
+  res.status(201).json(user);
+});
+
+// Env validation
+const EnvSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET:   z.string().min(32),
+  PORT:         z.coerce.number().default(3000),
+});
+
+export const env = EnvSchema.parse(process.env);
+
+
+
+
+
+Пояснення до кожного питання
+1
+Чому Node.js часто використовують для API backend?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Node.js в першу чергу підходить для:
+Підказка: Подієвий I/O.
+2
+Що найбільше покращує TypeScript strict mode?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: TypeScript strict mode допомагає тим, що:
+Підказка: Безпека на етапі компіляції.
+3
+Яка практична різниця між CommonJS і ESM?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Різниця CommonJS і ESM стосується:
+Підказка: Поведінка import/export.
+4
+Навіщо відділяти transport layer від domain-логіки?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Межа backend-сервісу має розділяти:
+Підказка: Чиста архітектура.
+5
+Як має оброблятися runtime-конфігурація backend?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Конфігурація має бути:
+Підказка: Безпечне завантаження конфігурації.
+6
+Реалізуйте isPositiveInt(value: unknown): value is number. Приймайте лише додатні цілі числа й узгодьте runtime-перевірку з оголошеним type guard.
+7
+Напишіть getPort(env) для Node-конфігурації. Розпарсьте PORT зі змінних середовища й кидайте помилку, якщо значення відсутнє, невалідне або непридатне до використання.
+8
+Реалізуйте shutdown(server) для graceful shutdown Node-сервера. Обгорніть callback-based close у Promise і дочекайтеся його завершення.
+
+

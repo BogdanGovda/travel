@@ -1,0 +1,214 @@
+https://www.youtube.com/watch?v=p6dO9u0M7MQ
+
+Базова теорія
+TypeScript — типізований надсет JavaScript; типи стираються під час компіляції, нульова runtime-вартість.
+Інтерфейси описують форму об'єктів; type aliases охоплюють union, примітиви, tuples і mapped types.
+Дженерики дають reusable type-safe код: function identity<T>(value: T): T — T виводиться на місці виклику.
+Використовуйте unknown замість any — він потребує type narrowing перед використанням, виловлюючи баги заздалегідь.
+Utility types: Partial<T>, Required<T>, Readonly<T>, Pick<T,K>, Omit<T,K>, Record<K,V> — знайте всі.
+
+
+Повна теорія з прикладами коду
+Моделюйте доменні стани строгими типами
+Описуйте UI/API стани через discriminated union, щоб уникати неможливих комбінацій.
+
+Явно фіксуйте варіанти: loading, success, error, empty.
+
+Narrowing у switch/case робить бізнес-логіку безпечнішою і покращує аргументацію на співбесіді.
+
+Стан через discriminated union
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "success"; data: string[] }
+  | { kind: "error"; message: string };
+Utility types у практичних контрактах
+Використовуйте Pick для view-model з мінімально потрібними полями.
+
+Використовуйте Partial для patch-пейлоадів, де не всі властивості обов'язкові.
+
+Required застосовуйте лише там, де бізнес-логіка справді вимагає повноти об'єкта.
+
+Тип patch-пейлоаду
+interface User {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
+type UserPatch = Partial<Pick<User, "email" | "displayName">>;
+Generics для перевикористовуваних безпечних helper-ів
+Generic-функції зберігають зв'язок між типом входу і типом виходу.
+
+Уникайте any, якщо параметр типу може точно описати поведінку.
+
+Додавайте обмеження generic-параметрів, щоб сигнатури лишались читабельними та безпечними.
+
+Типізований wrapper результату
+type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+
+function ok<T>(value: T): Result<T> {
+  return { ok: true, value };
+}
+Ключові strict-налаштування TypeScript
+Вмикайте strict-режим на ранньому етапі, щоб слабкі контракти не розповзались по модулях.
+
+noUncheckedIndexedAccess і exactOptionalPropertyTypes зменшують приховані undefined-баги.
+
+Сприймайте tsconfig як архітектурні обмежувачі, а не просто набір прапорців компілятора.
+
+Фрагмент strict tsconfig
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  }
+}
+Runtime-валидація разом зі статичною типізацією
+TypeScript сам по собі не валідує зовнішні runtime-дані, наприклад API-відповіді.
+
+На межах системи використовуйте schema-валидацію і перетворюйте результат у довірені доменні типи.
+
+Такий підхід прибирає хибну впевненість, коли compile-time типи не збігаються з реальним payload.
+
+Спочатку валідуй, потім типізуй
+type UserDto = { id: string; email: string };
+
+function isUserDto(value: unknown): value is UserDto {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    typeof (value as UserDto).id === "string" &&
+    typeof (value as UserDto).email === "string"
+  );
+}
+
+
+Пояснення до кожного питання
+1
+Яка головна користь TypeScript у frontend-проєктах?
+TypeScript ловить невідповідності типів ще до runtime.
+Це особливо важливо при рефакторингу та спільних контрактах між командами.
+Строга типізація прискорює розробку через менше інтеграційних помилок.
+2
+Коли union type найбільш корисний?
+Union type описує значення, яке може бути одним із відомих варіантів.
+Він критичний для станів компонента, API-відповідей і workflow-гілок.
+Поєднуйте union з narrowing для безпечної повноти обробки станів.
+3
+Що робить Pick<T, K>?
+Pick<T, K> створює тип із вибраних ключів базового типу T.
+Це зручно для мінімальних payload-контрактів без дублювання інтерфейсів.
+Підхід зменшує дрейф типів між пов'язаними структурами.
+4
+Що таке generic у TypeScript?
+Generics дозволяють перевикористовувати логіку зі збереженням типів виклику.
+Підходить для wrapper-ів, утиліт даних і typed-абстракцій.
+Надмірні generics шкодять читабельності — тримайте типи практичними.
+5
+Який utility type робить усі властивості optional?
+Partial<T> робить усі властивості типу T optional.
+Корисно для patch-пейлоадів і поступового оновлення форм.
+Не зловживайте Partial там, де контракт має бути суворо обов'язковим.
+6
+Який keyword визначає перевикористовувану форму об'єкта в TypeScript?
+7
+Що робить utility-тип Readonly<T>?
+8
+Яка різниця між type і interface?
+9
+Що означає тип 'any'?
+10
+Що таке тип 'unknown'?
+11
+Що робить Partial<T>?
+12
+Що таке union type?
+13
+Що таке intersection type?
+14
+Що робить Required<T>?
+15
+Що таке generic type?
+16
+Що робить Pick<T, K>?
+17
+Що робить Omit<T, K>?
+18
+Що таке тип 'never'?
+19
+Що таке type assertion?
+20
+Як зробити властивість опціональною?
+21
+Що створює Record<K, T>?
+22
+Що таке тип 'void'?
+23
+Що таке type narrowing?
+24
+Що таке type guard?
+25
+Що робить NonNullable<T>?
+26
+Що таке 'as const' assertion?
+27
+Що таке tuple в TypeScript?
+28
+Що робить Exclude<T, U>?
+29
+Що робить Extract<T, U>?
+30
+Що таке оператор 'keyof'?
+31
+Що таке оператор 'typeof' в типах?
+32
+Для чого використовується 'infer'?
+33
+Що таке ReturnType<T>?
+34
+Що таке Parameters<T>?
+35
+Для чого 'extends' використовується в generics?
+36
+Що таке conditional type?
+37
+Що означає '!' після змінної?
+38
+Що таке enum в TypeScript?
+39
+Що таке mapped type?
+40
+Що робить ключове слово 'satisfies'?
+41
+Для чого ключове слово 'declare'?
+42
+Що таке discriminated union?
+43
+Що перевіряє оператор 'in' в типах?
+44
+Що таке Awaited<T>?
+45
+Що таке template literal type?
+46
+Що таке модифікатор 'readonly'?
+47
+Що робить InstanceType<T>?
+48
+Що таке index signature?
+49
+Що таке тип 'this'?
+50
+Що робить Uppercase<S>?
+51
+Що таке const assertion для масивів?
+52
+Що таке опція компілятора 'noImplicitAny'?
+53
+Створіть generic-хелпер parseSafe<T>(raw). Він має намагатися розпарсити JSON і повертати типізований Result<T> замість того, щоб кидати помилку назовні.
+54
+Реалізуйте TypeScript type guard isApiError(value). Поверніть true лише для об'єктів, у яких є рядкові поля code та message.
+55
+Збережіть mapValues<T, R> повністю типізованою. Реалізація має зберігати generics і не використовувати небезпечні касти, повертаючи масив після мапінгу.

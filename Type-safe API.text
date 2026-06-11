@@ -1,0 +1,299 @@
+Базова теорія
+Валідуйте runtime-вхід навіть при compile-time типах TypeScript.
+Генеруйте або шарьте DTO-контракти для зменшення розходження frontend/backend.
+Тримайте payload помилок консистентними для передбачуваної обробки клієнтом.
+Використовуйте discriminated unions для явного моделювання success/error відповідей.
+Не виносьте внутрішні поля домену у публічні форми API.\
+
+
+
+
+Повна теорія з прикладами коду
+Реалізація Repository pattern
+Спочатку визначте інтерфейс repository. Інтерфейс належить доменному шару, реалізація — інфраструктурному.
+
+Сервісний шар залежить від інтерфейсу, а не від конкретного класу. Це дозволяє замінювати реалізації без зміни бізнес-логіки.
+
+Repository тільки для доступу до даних. Жодної бізнес-логіки всередині repositories.
+
+Інтерфейс та реалізації Repository
+// Domain layer — interface
+export interface IUserRepository {
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  save(user: User): Promise<User>;
+  delete(id: string): Promise<void>;
+}
+
+// Infrastructure layer — Postgres implementation
+import { Pool } from "pg";
+
+export class PgUserRepository implements IUserRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async findById(id: string): Promise<User | null> {
+    const { rows } = await this.pool.query(
+      "SELECT id, name, email, created_at FROM users WHERE id = $1",
+      [id],
+    );
+    return rows[0] ? this.mapRow(rows[0]) : null;
+  }
+
+  async save(user: User): Promise<User> {
+    const { rows } = await this.pool.query(
+      `INSERT INTO users (id, name, email) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET name = $2, email = $3
+       RETURNING id, name, email`,
+      [user.id, user.name, user.email],
+    );
+    return this.mapRow(rows[0]);
+  }
+
+  private mapRow(row: Record<string, unknown>): User {
+    return { id: row.id as string, name: row.name as string, email: row.email as string };
+  }
+}
+
+// Service — depends on interface, not implementation
+export class UserService {
+  constructor(private readonly users: IUserRepository) {}
+
+  async getUser(id: string): Promise<User> {
+    const user = await this.users.findById(id);
+    if (!user) throw new NotFoundError("User");
+    return user;
+  }
+}
+DTO маппінг та формування відповідей
+Маппуйте внутрішні доменні об'єкти в response DTO перед відправкою. Запобігає витоку внутрішніх полів.
+
+Створюйте явні функції або класи-маппери. Уникайте object spread в надії що включаться правильні поля.
+
+Версіоновані DTO: v1 і v2 одного ендпоінту можуть мати різні форми відповіді через окремі функції маппінгу.
+
+DTO схеми та функції маппінгу
+import { z } from "zod";
+
+// Internal domain model (from DB)
+interface UserEntity {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;   // sensitive — must not leave server
+  deletedAt: Date | null;
+}
+
+// Response DTO — what the API returns
+const UserResponseSchema = z.object({
+  id:        z.string(),
+  name:      z.string(),
+  email:     z.string(),
+  createdAt: z.string(),
+});
+
+type UserResponse = z.infer<typeof UserResponseSchema>;
+
+// Explicit mapper
+function toUserResponse(user: UserEntity): UserResponse {
+  return {
+    id:        user.id,
+    name:      user.name,
+    email:     user.email,
+    createdAt: user.createdAt.toISOString(),
+    // passwordHash — excluded
+    // deletedAt — excluded
+  };
+}
+
+// Route handler
+router.get("/users/:id", async (req, res) => {
+  const user = await userService.getUser(req.params.id);
+  res.json(toUserResponse(user));  // safe — only public fields
+});
+Композиція middleware в Express
+Express middleware — функція з підписом (req, res, next). Викликайте next() для переходу до наступного, next(err) для обробки помилок.
+
+Порядок важливий: middleware автентифікації перед авторизацією, яка перед бізнес-логікою.
+
+Комбінуйте масиви middleware на рівні маршруту: [authenticate, requireAdmin, validateBody(schema), handler].
+
+Патерн композиції middleware
+import { Request, Response, NextFunction } from "express";
+
+// Authentication middleware
+async function authenticate(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "UNAUTHORIZED" });
+
+  try {
+    req.user = verifyJwt(token);
+    next();
+  } catch {
+    res.status(401).json({ error: "INVALID_TOKEN" });
+  }
+}
+
+// Authorization middleware factory
+function requireRole(role: "admin" | "moderator") {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.role !== role) {
+      return res.status(403).json({ error: "FORBIDDEN" });
+    }
+    next();
+  };
+}
+
+// Validation middleware factory
+function validateBody<T extends z.ZodTypeAny>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(422).json({ error: "VALIDATION_ERROR", details: result.error.flatten() });
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+// Composed route
+router.delete(
+  "/admin/users/:id",
+  authenticate,
+  requireRole("admin"),
+  async (req, res) => {
+    await userService.delete(req.params.id);
+    res.status(204).send();
+  },
+);
+Тестування TypeScript backend з Jest
+Unit тести перевіряють функції та класи в ізоляції з моками. Швидкі, багато.
+
+Інтеграційні тести перевіряють маршрути з реальною БД (тестовою). Перевіряють повний цикл запит-відповідь.
+
+jest.mock() або ручні моки для repositories в unit тестах. Реальні реалізації в інтеграційних.
+
+Приклади unit та інтеграційних тестів
+import { UserService } from "./UserService";
+import { IUserRepository } from "./IUserRepository";
+
+// Unit test — mocked repository
+describe("UserService.getUser", () => {
+  const mockRepo: jest.Mocked<IUserRepository> = {
+    findById:    jest.fn(),
+    findByEmail: jest.fn(),
+    save:        jest.fn(),
+    delete:      jest.fn(),
+  };
+
+  const service = new UserService(mockRepo);
+
+  afterEach(() => jest.clearAllMocks());
+
+  it("returns user when found", async () => {
+    const user = { id: "1", name: "Ana", email: "ana@test.com" };
+    mockRepo.findById.mockResolvedValue(user);
+
+    const result = await service.getUser("1");
+    expect(result).toEqual(user);
+    expect(mockRepo.findById).toHaveBeenCalledWith("1");
+  });
+
+  it("throws NotFoundError when user does not exist", async () => {
+    mockRepo.findById.mockResolvedValue(null);
+    await expect(service.getUser("999")).rejects.toThrow("User not found");
+  });
+});
+
+// Integration test — real DB, real route
+import request from "supertest";
+import { app } from "../app";
+
+describe("GET /users/:id", () => {
+  it("returns 200 with user for valid ID", async () => {
+    const res = await request(app)
+      .get("/users/test-user-id")
+      .set("Authorization", `Bearer ${testToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: "test-user-id", name: expect.any(String) });
+    expect(res.body).not.toHaveProperty("passwordHash");
+  });
+});
+Документація API з OpenAPI
+OpenAPI 3.0 — стандарт документації REST API. Генеруйте з коду через zod-to-openapi або express-openapi-validator.
+
+Документуйте кожен ендпоінт: схема тіла, path/query параметри, схеми відповідей для всіх статус-кодів.
+
+Swagger UI або Redoc для інтерактивної документації з OpenAPI специфікації.
+
+Структура OpenAPI специфікації для CRUD ендпоінту
+// Using zod-to-openapi
+import { OpenAPIRegistry, OpenApiGeneratorV3, extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
+
+extendZodWithOpenApi(z);
+
+const registry = new OpenAPIRegistry();
+
+const UserResponseSchema = z.object({
+  id:    z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
+  name:  z.string().openapi({ example: "Ana Kovalenko" }),
+  email: z.string().email().openapi({ example: "ana@example.com" }),
+}).openapi("UserResponse");
+
+registry.registerPath({
+  method:  "get",
+  path:    "/users/{id}",
+  summary: "Get user by ID",
+  tags:    ["Users"],
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+  },
+  responses: {
+    200: { description: "User found",     content: { "application/json": { schema: UserResponseSchema } } },
+    401: { description: "Unauthorized" },
+    404: { description: "User not found" },
+  },
+});
+
+const generator = new OpenApiGeneratorV3(registry.definitions);
+export const openApiDocument = generator.generateDocument({
+  openapi: "3.0.0",
+  info: { title: "My API", version: "1.0.0" },
+});
+
+
+Пояснення до кожного питання
+1
+Чому runtime-валідація потрібна навіть із TypeScript?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Runtime-валідація потрібна, тому що:
+Підказка: Не довіряйте входу.
+2
+Що дає стабільна схема помилок?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Консистентний формат помилок допомагає:
+Підказка: Стабільні інтеграції.
+3
+Що таке API contract drift?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Drift DTO-контракту означає:
+Підказка: Розбіжність типів між шарами.
+4
+Навіщо використовувати discriminated union у моделях API-результатів?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Discriminated union корисний для:
+Підказка: Типізоване гілкування.
+5
+Чого мають уникати публічні API-відповіді?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Публічна API-відповідь має уникати:
+Підказка: Інкапсуляція.
+6
+Напишіть ensureCreateUser(input) як типізований DTO-валідатор. Відхиляйте невалідний ввід і повертайте CreateUserDto лише тоді, коли payload має потрібну форму.
+7
+Полагодьте mapError(error), щоб усі domain-помилки перетворювалися в один і той самий публічний контракт. Повернений об'єкт має стабільно містити code, message і details.
+8
+Реалізуйте requireIdempotency(headers) для create-ендпоінта. Зчитайте idempotency key із заголовків і кидайте помилку, якщо він відсутній або порожній.
+
+

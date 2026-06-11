@@ -1,0 +1,284 @@
+Базова теорія
+Використовуйте repository-абстракції для ізоляції persistence-деталей від domain-сервісів.
+Явно моделюйте транзакції для багатокрокових записів з вимогами консистентності.
+Обирайте ORM чи query builder залежно від складності та потреби контролю.
+Проєктуйте контракти pagination/filtering/sorting з розрахунком на масштаб.
+Відстежуйте регресії продуктивності запитів через telemetry, а не припущення.
+
+
+Повна теорія з прикладами коду
+Патерни Prisma запитів
+Завжди використовуйте select для вказання потрібних полів. Без select Prisma повертає всі поля включаючи чутливі.
+
+include для зв'язків замість окремих запитів. Генерує оптимізований JOIN всередині.
+
+Cursor пагінація з Prisma: cursor на ID останнього елементу для ефективної пагінації великих наборів даних.
+
+Prisma CRUD та патерни зв'язків
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+// Select specific fields (avoids over-fetching and leaking passwordHash)
+const user = await prisma.user.findUnique({
+  where: { id: userId },
+  select: { id: true, name: true, email: true, createdAt: true },
+});
+
+// Include relations — generates optimized JOIN
+const userWithOrders = await prisma.user.findUnique({
+  where: { id: userId },
+  select: {
+    id: true, name: true, email: true,
+    orders: {
+      select: { id: true, total: true, status: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    },
+  },
+});
+
+// Cursor pagination (efficient for large datasets)
+const products = await prisma.product.findMany({
+  take: 20,
+  skip: cursor ? 1 : 0,
+  cursor: cursor ? { id: cursor } : undefined,
+  where: { categoryId, deletedAt: null },
+  orderBy: { createdAt: "desc" },
+});
+
+// Transaction
+await prisma.$transaction([
+  prisma.order.create({ data: { userId, total } }),
+  prisma.product.update({ where: { id: productId }, data: { stock: { decrement: qty } } }),
+]);
+Redis кешування в Node.js
+Використовуйте ioredis в Node.js — підтримує cluster, sentinel та pipeline з коробки.
+
+Pipeline декілька команд для зменшення round-trips: pipeline.get / pipeline.set / pipeline.exec.
+
+MULTI/EXEC для атомарних операцій: check-then-set паттерни що не повинні перериватись.
+
+Cache-aside патерн з Redis та TypeScript
+import Redis from "ioredis";
+
+const redis = new Redis({ host: "localhost", port: 6379 });
+
+class CacheService {
+  private readonly ttl = 300; // 5 minutes
+
+  async getOrSet<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    ttl = this.ttl,
+  ): Promise<T> {
+    const cached = await redis.get(key);
+    if (cached) return JSON.parse(cached) as T;
+
+    const value = await fetcher();
+    await redis.setex(key, ttl, JSON.stringify(value));
+    return value;
+  }
+
+  async invalidate(pattern: string) {
+    const keys = await redis.keys(pattern);
+    if (keys.length) await redis.del(...keys);
+  }
+}
+
+const cache = new CacheService();
+
+// Usage in service
+class UserService {
+  async getProfile(userId: string) {
+    return cache.getOrSet(
+      `user:profile:${userId}`,
+      () => this.repo.findById(userId),
+      600, // 10 minutes for profiles
+    );
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileDto) {
+    const user = await this.repo.update(userId, data);
+    await cache.invalidate(`user:profile:${userId}`);
+    return user;
+  }
+}
+Кращі практики Prisma схема-дизайну
+Використовуйте UUID для первинних ключів щоб уникнути атак перебору ID та дозволити розподілену генерацію.
+
+Додавайте createdAt та updatedAt до кожної моделі. @default(now()) та @updatedAt.
+
+Soft delete: поле deletedAt: DateTime?. Фільтруйте WHERE deletedAt IS NULL у всіх запитах.
+
+Prisma схема зі зв'язками
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String    @db.VarChar(100)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash")
+  role         Role      @default(USER)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  orders Order[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@index([userId, createdAt])
+  @@map("orders")
+}
+
+enum Role { USER MODERATOR ADMIN }
+enum OrderStatus { PENDING CONFIRMED SHIPPED DELIVERED CANCELLED }
+Оптимізація запитів у TypeScript backend
+queryRawUnsafe лише коли ORM не може ефективно виразити запит. Надавайте перевагу типізованому API Prisma.
+
+Вимірюйте продуктивність запитів через query event logging Prisma або pg query timing.
+
+Розмір пулу з'єднань: починайте з 10 на інстанс застосунку. Коригуйте на основі кількості CPU та затримки запитів.
+
+Логування та оптимізація Prisma запитів
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient({
+  log: [
+    { emit: "event", level: "query" },
+    { emit: "stdout", level: "error" },
+  ],
+});
+
+// Log slow queries in development
+prisma.$on("query", (event) => {
+  if (event.duration > 100) {
+    console.warn(`Slow query (${event.duration}ms):`, event.query);
+  }
+});
+
+// Optimized: select only needed fields, avoid N+1
+async function getOrdersWithUsers(status: string) {
+  return prisma.order.findMany({
+    where: { status, deletedAt: null },
+    select: {
+      id: true,
+      total: true,
+      status: true,
+      createdAt: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+}
+
+// Batch operations instead of loops
+async function updateOrderStatuses(orderIds: string[], status: string) {
+  return prisma.order.updateMany({
+    where: { id: { in: orderIds } },
+    data: { status, updatedAt: new Date() },
+  });
+}
+Стратегія міграцій бази даних
+Міграції мають бути зворотньо сумісними при zero-downtime деплоях: додавайте колонки з defaults перед видаленням старих.
+
+Ніколи не видаляйте колонку в тій самій міграції що видаляє код що її використовує. Два кроки: деплой без колонки, потім видалення.
+
+Тестуйте rollback кожної міграції в staging перед застосуванням у продакшні.
+
+Патерн міграції з нульовим простоєм
+// Zero-downtime column rename: username → name
+// WRONG: rename in one step — breaks live code reading 'username'
+// ALTER TABLE users RENAME COLUMN username TO name;
+
+// CORRECT: 3-step process
+
+// Step 1: Add new column (backward compatible)
+// Migration 001: add 'name' column, copy from 'username'
+// ALTER TABLE users ADD COLUMN name VARCHAR(100);
+// UPDATE users SET name = username;
+
+// Step 2: Deploy code that reads both columns, writes to both
+// const name = row.name ?? row.username;
+
+// Step 3: After all instances run new code:
+// Deploy code that only uses 'name'
+// Migration 002: drop 'username' column
+// ALTER TABLE users DROP COLUMN username;
+
+// Prisma migration example (Step 1):
+// npx prisma migrate dev --name "add_name_column"
+// Generated SQL:
+// ALTER TABLE users ADD COLUMN name VARCHAR(100);
+// UPDATE users SET name = username WHERE name IS NULL;
+
+// Always verify:
+// npx prisma migrate status       — check pending migrations
+// npx prisma migrate deploy       — apply in production
+// npx prisma migrate reset        — reset dev database (DANGEROUS in prod)
+
+
+
+Пояснення до кожного питання
+1
+Що насамперед покращує repository pattern?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Repository-патерн допомагає:
+Підказка: Розділення шарів.
+2
+Коли DB-транзакція є обов'язковою?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Транзакція потрібна коли:
+Підказка: Атомарність.
+3
+Що має визначати надійний контракт пагінації?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Контракт pagination має включати:
+Підказка: Детермінована пагінація.
+4
+Навіщо збирати telemetry/tracing для запитів?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Telemetry для БД допомагає:
+Підказка: Спостерігайте поведінку запитів.
+5
+Як приймати рішення між ORM і query builder?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Вибір ORM чи query builder має бути:
+Підказка: Контекст важливіший за догму.
+6
+Напишіть findUserByEmail(db, email) на рівні repository. Використайте parameterized SQL-запит і дочекайтеся відповіді від бази замість interpolation користувацького вводу.
+7
+Реалізуйте tx(db, fn) як transaction wrapper. Починайте транзакцію, запускайте callback, робіть commit при успіху і rollback при помилці.
+8
+Полагодьте pageParams(page, pageSize), щоб захистити бекенд від шкідливих значень. Обмежуйте page size, безпечно обчислюйте offset і повертайте нормалізовані
+
+
+
+

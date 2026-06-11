@@ -1,0 +1,321 @@
+https://www.youtube.com/watch?v=mbsmsi7l3r4
+
+Базова теорія
+Обирайте token/session стратегію з урахуванням threat model і архітектури деплою.
+Робіть RBAC-перевірки близько до бізнес-дій, а не лише на рівні роутів.
+Застосовуйте CSRF/XSS захист там, де використовуються cookie-сесії.
+Аудіть залежності на вразливості і швидко закривайте критичні проблеми.
+Віддавайте клієнту мінімум деталей помилки, зберігаючи повну внутрішню діагностику.
+
+
+Повна теорія з прикладами коду
+Реалізація JWT автентифікації
+Використовуйте jsonwebtoken або jose. jose має кращу TypeScript підтримку та підтримує сучасні алгоритми.
+
+Завжди встановлюйте exp, iss, aud claims. Перевіряйте всі три при декодуванні.
+
+Ротуйте JWT секрети. Підтримуйте два активних секрети при ротації щоб не інвалідувати всі активні сесії.
+
+Реалізація JWT auth service
+import jwt from "jsonwebtoken";
+import { env } from "../config/env";
+
+interface TokenPayload {
+  sub:   string;  // user ID
+  role:  string;
+  email: string;
+}
+
+export class AuthService {
+  private readonly accessTtl  = "15m";
+  private readonly refreshTtl = "30d";
+
+  signAccessToken(payload: TokenPayload): string {
+    return jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn:  this.accessTtl,
+      issuer:     "api.myapp.com",
+      audience:   "myapp.com",
+    });
+  }
+
+  signRefreshToken(userId: string): string {
+    return jwt.sign({ sub: userId }, env.JWT_REFRESH_SECRET, {
+      expiresIn: this.refreshTtl,
+      issuer:    "api.myapp.com",
+    });
+  }
+
+  verifyAccessToken(token: string): TokenPayload {
+    try {
+      return jwt.verify(token, env.JWT_SECRET, {
+        issuer:   "api.myapp.com",
+        audience: "myapp.com",
+      }) as TokenPayload;
+    } catch (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        throw new UnauthorizedError("Token expired");
+      }
+      throw new UnauthorizedError("Invalid token");
+    }
+  }
+}
+
+// Set refresh token in HttpOnly cookie
+function setRefreshCookie(res: Response, token: string) {
+  res.cookie("refresh_token", token, {
+    httpOnly: true,
+    secure:   env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days
+    path:     "/auth/refresh",
+  });
+}
+Security headers з helmet.js
+helmet.js встановлює 11+ security HTTP заголовків з розумними defaults. Використовуйте як перший middleware.
+
+Content-Security-Policy — найважливіший заголовок. Налаштовуйте ретельно для ресурсів вашого застосунку.
+
+Strict-Transport-Security (HSTS) примушує HTTPS після першого відвідування. Довгий max-age (1 рік) у продакшні.
+
+Налаштування helmet.js для REST API
+import helmet from "helmet";
+import cors from "cors";
+import express from "express";
+
+const app = express();
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'"],
+      styleSrc:    ["'self'", "'unsafe-inline'"],
+      imgSrc:      ["'self'", "data:", "https://cdn.myapp.com"],
+      connectSrc:  ["'self'", "https://api.myapp.com"],
+      fontSrc:     ["'self'"],
+      objectSrc:   ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,     // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+}));
+
+// CORS configuration
+const allowedOrigins = env.ALLOWED_ORIGINS.split(",");
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: ${origin} not allowed`));
+    }
+  },
+  credentials: true,           // allow cookies
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+  exposedHeaders: ["X-Request-ID"],
+  maxAge: 86400,               // preflight cache: 24 hours
+}));
+Валідація вводу та запобігання ін'єкціям
+Валідуйте на межі: відхиляйте невалідний ввід перед бізнес-логікою або БД.
+
+Параметризовані запити запобігають SQL ін'єкції. Prisma це робить автоматично. Raw запити — prepared statements.
+
+Ніколи не передавайте ввід юзера в eval(), Function() або child_process.exec() — це вмикає code injection.
+
+Валідація вводу та безпечні патерни
+import { z } from "zod";
+
+// Strong validation prevents injection at the schema level
+const SearchSchema = z.object({
+  query:    z.string().max(100).regex(/^[a-zA-Z0-9s-_]+$/, "Invalid characters"),
+  category: z.enum(["electronics", "clothing", "books"]),
+  page:     z.coerce.number().int().min(1).max(100).default(1),
+  limit:    z.coerce.number().int().min(1).max(50).default(20),
+});
+
+// SAFE: Prisma handles parameterization
+async function searchProducts(query: string, category: string) {
+  return prisma.product.findMany({
+    where: {
+      name:     { contains: query, mode: "insensitive" },
+      category: category as Category,
+    },
+  });
+}
+
+// SAFE: raw query with parameterized input
+async function searchRaw(query: string, db: Pool) {
+  return db.query(
+    "SELECT id, name FROM products WHERE name ILIKE $1",
+    [`%${query}%`],   // parameterized — safe
+  );
+}
+
+// DANGEROUS — do not do this
+// db.query(`SELECT * FROM products WHERE name LIKE '%${query}%'`)
+// eval(userProvidedCode)
+// exec(`convert ${userFileName} output.pdf`)
+
+// SAFE alternative for system commands
+import { execFile } from "child_process";
+const allowedFiles = /^[a-f0-9]{32}.(pdf|png|jpg)$/;
+if (!allowedFiles.test(filename)) throw new ValidationError("Invalid filename");
+execFile("convert", [sanitizedPath, outputPath], callback);
+Ротація та анулювання refresh tokens
+Ротація refresh tokens: видавайте новий при кожному використанні. Зберігайте хеш кожного в БД. Інвалідуйте після використання.
+
+Якщо використаний refresh token надіслано знову — це ознака крадіжки. Інвалідуйте всю сімейку (всі refresh tokens юзера).
+
+Зберігайте тільки хеш refresh tokens у БД — не сирий токен. При витоку БД хешовані токени не можна використати.
+
+Реалізація ротації refresh tokens
+import crypto from "crypto";
+import { prisma } from "./db";
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+export class RefreshTokenService {
+  async create(userId: string): Promise<string> {
+    const token = crypto.randomBytes(64).toString("hex");
+    const hash  = hashToken(token);
+
+    await prisma.refreshToken.create({
+      data: {
+        hash,
+        userId,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        family:    crypto.randomUUID(), // token family for theft detection
+      },
+    });
+
+    return token;
+  }
+
+  async rotate(oldToken: string): Promise<string> {
+    const hash = hashToken(oldToken);
+    const stored = await prisma.refreshToken.findUnique({ where: { hash } });
+
+    if (!stored) {
+      // Token not found — possible theft attempt
+      throw new UnauthorizedError("Invalid refresh token");
+    }
+
+    if (stored.usedAt) {
+      // Token already used — THEFT DETECTED
+      // Invalidate entire family
+      await prisma.refreshToken.deleteMany({ where: { family: stored.family } });
+      throw new UnauthorizedError("Refresh token reuse detected");
+    }
+
+    // Mark as used
+    await prisma.refreshToken.update({
+      where: { hash },
+      data:  { usedAt: new Date() },
+    });
+
+    return this.create(stored.userId);  // issue new token
+  }
+}
+Rate limiting для ендпоінтів автентифікації
+Захист від brute force: окремо обмежуйте спроби входу per IP і per акаунт. IP ліміт — від ботнетів, акаунт ліміт — від цільових атак.
+
+Блокування акаунту після N невдалих спроб додає ще один шар. Exponential backoff на рівні акаунту.
+
+Повертайте одне і те ж повідомлення помилки для 'юзер не знайдено' і 'неправильний пароль' щоб запобігти user enumeration.
+
+Auth rate limiting з Redis
+import Redis from "ioredis";
+
+const redis = new Redis();
+
+async function checkLoginRateLimit(ip: string, email: string): Promise<void> {
+  const ipKey      = `ratelimit:login:ip:${ip}`;
+  const accountKey = `ratelimit:login:account:${email}`;
+
+  const [ipCount, accountCount] = await Promise.all([
+    redis.incr(ipKey),
+    redis.incr(accountKey),
+  ]);
+
+  // Set expiry on first increment
+  if (ipCount      === 1) await redis.expire(ipKey,      60);   // 1 minute window
+  if (accountCount === 1) await redis.expire(accountKey, 900);  // 15 minute window
+
+  if (ipCount > 20) {
+    throw new RateLimitError("Too many login attempts from this IP");
+  }
+  if (accountCount > 5) {
+    throw new RateLimitError("Too many failed attempts. Try again in 15 minutes.");
+  }
+}
+
+// Login route with rate limiting
+router.post("/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  const ip = req.ip!;
+
+  await checkLoginRateLimit(ip, email);
+
+  const user = await userRepo.findByEmail(email);
+
+  // Same message regardless of whether user exists
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    throw new UnauthorizedError("Invalid email or password");
+  }
+
+  // Success — reset account counter
+  await redis.del(`ratelimit:login:account:${email}`);
+
+  const accessToken  = authService.signAccessToken(user);
+  const refreshToken = await refreshTokenService.create(user.id);
+  setRefreshCookie(res, refreshToken);
+
+  res.json({ accessToken });
+});
+
+
+
+Пояснення до кожного питання
+1
+Де мають виконуватися RBAC-перевірки?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: RBAC-перевірка має відбуватись:
+Підказка: Перевіряйте біля дії.
+2
+Який ключовий ризик у cookie-based session auth?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Додатки з cookie-сесіями мають захищатися від:
+Підказка: Міжсайтові запити.
+3
+Яка політика щодо вразливостей залежностей є правильною?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Політика щодо вразливостей залежностей має:
+Підказка: Гігієна безпеки.
+4
+Як мають повертатися клієнтські помилки?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Клієнтські помилки мають:
+Підказка: Безпечне розкриття помилок.
+5
+Як пов'язані authentication і authorization?
+Фокусуйтеся на базовому reasoning та практичних прикладах.
+Контекст питання: Автентифікація та авторизація це:
+Підказка: Ідентичність проти прав.
+6
+Реалізуйте parseBearer(authHeader), яка повертає token або null. Приймайте лише стандартний формат Bearer і безпечно відхиляйте все інше.
+7
+Полагодьте canAccess(role, action), щоб вона працювала за правилами deny-by-default. Поверніть true лише для явно дозволених RBAC-комбінацій.
+8
+Напишіть sanitizeLog(payload), щоб чутливі дані ніколи не потрапляли в логи. Прибирайте поля на кшталт password і token перед поверненням очищеного об'єкта.
+
+
